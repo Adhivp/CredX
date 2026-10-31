@@ -1,6 +1,6 @@
 # CredX evaluation report
 
-Generated 2026-10-31T12:40:17+00:00 from commit `1be3d1a` (Windows-11-10.0.26300-SP0, Python 3.14.7). LLM mode: **nebius**.
+Generated 2026-10-31T12:50:47+00:00 from commit `caef7f8` (Windows-11-10.0.26300-SP0, Python 3.14.7). LLM mode: **nebius**.
 
 All figures below were computed by `python -m evaluation.run_eval` in this run. The scenarios are synthetic and labelled by design (see `evaluation/scenarios.py`); they test behaviour, not predictive accuracy on real portfolios.
 
@@ -61,11 +61,11 @@ Written and labelled before the system was first run on them, and not used for t
 - Required specialists selected: 100%; excluded specialists avoided: 100%; mean specialists per case 2.38
 - Scenarios with parallel execution: 9
 - Specialist-initiated delegations authorised: 5; duplicate requests blocked: 4; duplicate tasks executed: 0
-- Challenges raised: 14; re-investigations that addressed their challenge: 1.0
+- Challenges raised: 39; re-investigations that addressed their challenge: 1.0
 - Evidence references: 131, valid 100%; data-issue discovery recall 100%
 - Clean termination: 100%; mean rounds 1.44; low-risk cases needing more than one round: 0
 - Human-review routing matched labels: 100%
-- Mean latency per investigation: 5.98 s; LLM calls 98, tokens 48316, cost USD 0.0 (cost is 0 unless LLM_*_COST_PER_MTOK are configured)
+- Mean latency per investigation: 4.946 s; LLM calls 78, tokens 40694, cost USD 0.0 (cost is 0 unless LLM_*_COST_PER_MTOK are configured)
 
 ## Security, human-in-the-loop and agent-loop test suites
 

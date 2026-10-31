@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generated_at": "2026-10-31T12:40:17+00:00",
-    "commit": "1be3d1a",
+    "generated_at": "2026-10-31T12:50:47+00:00",
+    "commit": "caef7f8",
     "llm_mode": "nebius",
     "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
     "platform": "Windows-11-10.0.26300-SP0",
@@ -97,14 +97,14 @@
     "evidence_reference_validity": 1.0,
     "evidence_references": 131,
     "data_issue_discovery_recall": 1.0,
-    "challenges_raised": 14,
+    "challenges_raised": 39,
     "reinvestigation_effectiveness": 1.0,
     "terminated_cleanly": 1.0,
     "multi_round_low_risk_cases": 0,
     "mean_rounds": 1.44,
-    "mean_latency_seconds": 5.98,
-    "llm_calls": 98,
-    "llm_tokens": 48316,
+    "mean_latency_seconds": 4.946,
+    "llm_calls": 78,
+    "llm_tokens": 40694,
     "llm_cost_usd": 0.0
   },
   "scenarios": [
@@ -142,7 +142,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -153,13 +153,12 @@
       "missing_evidence_items": 0,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 4.878,
-      "llm_calls": 4,
-      "llm_tokens": 1731,
+      "latency_seconds": 4.612,
+      "llm_calls": 3,
+      "llm_tokens": 1551,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 2
+        "ok": 3
       }
     },
     {
@@ -197,7 +196,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -208,13 +207,12 @@
       "missing_evidence_items": 0,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 3.466,
-      "llm_calls": 4,
-      "llm_tokens": 1768,
+      "latency_seconds": 3.432,
+      "llm_calls": 3,
+      "llm_tokens": 1575,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 2
+        "ok": 3
       }
     },
     {
@@ -256,7 +254,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 2,
+      "challenges": 4,
       "material_challenges": 1,
       "reinvestigation_challenges": 2,
       "reinvestigation_addressed": 2,
@@ -267,13 +265,12 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 7.106,
-      "llm_calls": 9,
-      "llm_tokens": 4170,
+      "latency_seconds": 7.355,
+      "llm_calls": 7,
+      "llm_tokens": 3660,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 5
+        "ok": 7
       }
     },
     {
@@ -314,7 +311,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 2,
+      "challenges": 4,
       "material_challenges": 1,
       "reinvestigation_challenges": 2,
       "reinvestigation_addressed": 2,
@@ -325,13 +322,12 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 7.175,
-      "llm_calls": 9,
-      "llm_tokens": 4306,
+      "latency_seconds": 6.657,
+      "llm_calls": 7,
+      "llm_tokens": 3730,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 5
+        "ok": 7
       }
     },
     {
@@ -374,7 +370,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 3,
+      "challenges": 5,
       "material_challenges": 1,
       "reinvestigation_challenges": 2,
       "reinvestigation_addressed": 2,
@@ -385,13 +381,12 @@
       "missing_evidence_items": 2,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 7.179,
-      "llm_calls": 9,
-      "llm_tokens": 4108,
+      "latency_seconds": 6.429,
+      "llm_calls": 7,
+      "llm_tokens": 3648,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 5
+        "ok": 7
       }
     },
     {
@@ -431,7 +426,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 1,
+      "challenges": 4,
       "material_challenges": 0,
       "reinvestigation_challenges": 1,
       "reinvestigation_addressed": 1,
@@ -442,13 +437,12 @@
       "missing_evidence_items": 0,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 7.328,
-      "llm_calls": 7,
-      "llm_tokens": 3422,
+      "latency_seconds": 5.056,
+      "llm_calls": 5,
+      "llm_tokens": 2523,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 3
+        "ok": 5
       }
     },
     {
@@ -491,7 +485,7 @@
       "delegations_rejected": 1,
       "duplicate_requests_blocked": 1,
       "duplicate_tasks_executed": 0,
-      "challenges": 2,
+      "challenges": 3,
       "material_challenges": 1,
       "reinvestigation_challenges": 1,
       "reinvestigation_addressed": 1,
@@ -502,13 +496,12 @@
       "missing_evidence_items": 2,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 9.661,
-      "llm_calls": 10,
-      "llm_tokens": 5449,
+      "latency_seconds": 7.502,
+      "llm_calls": 8,
+      "llm_tokens": 4378,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 6
+        "ok": 8
       }
     },
     {
@@ -556,9 +549,9 @@
       "missing_evidence_items": 0,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 2.475,
+      "latency_seconds": 2.393,
       "llm_calls": 2,
-      "llm_tokens": 948,
+      "llm_tokens": 998,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
         "ok": 2
@@ -603,7 +596,7 @@
       "delegations_rejected": 1,
       "duplicate_requests_blocked": 1,
       "duplicate_tasks_executed": 0,
-      "challenges": 2,
+      "challenges": 4,
       "material_challenges": 1,
       "reinvestigation_challenges": 1,
       "reinvestigation_addressed": 1,
@@ -614,13 +607,12 @@
       "missing_evidence_items": 2,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 9.902,
-      "llm_calls": 10,
-      "llm_tokens": 5622,
+      "latency_seconds": 7.481,
+      "llm_calls": 8,
+      "llm_tokens": 4387,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 6
+        "ok": 8
       }
     },
     {
@@ -663,7 +655,7 @@
       "delegations_rejected": 2,
       "duplicate_requests_blocked": 2,
       "duplicate_tasks_executed": 0,
-      "challenges": 2,
+      "challenges": 3,
       "material_challenges": 1,
       "reinvestigation_challenges": 1,
       "reinvestigation_addressed": 1,
@@ -674,13 +666,12 @@
       "missing_evidence_items": 2,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 7.632,
-      "llm_calls": 10,
-      "llm_tokens": 5463,
+      "latency_seconds": 6.813,
+      "llm_calls": 8,
+      "llm_tokens": 4569,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 4,
-        "ok": 6
+        "ok": 8
       }
     },
     {
@@ -724,9 +715,9 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 1.44,
+      "latency_seconds": 1.627,
       "llm_calls": 1,
-      "llm_tokens": 379,
+      "llm_tokens": 389,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
         "ok": 1
@@ -764,7 +755,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -775,13 +766,12 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": true,
       "terminated_cleanly": true,
-      "latency_seconds": 10.397,
-      "llm_calls": 6,
-      "llm_tokens": 3106,
+      "latency_seconds": 4.414,
+      "llm_calls": 5,
+      "llm_tokens": 2446,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 4
+        "ok": 5
       }
     },
     {
@@ -817,7 +807,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -828,13 +818,12 @@
       "missing_evidence_items": 0,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 6.569,
-      "llm_calls": 6,
-      "llm_tokens": 2899,
+      "latency_seconds": 5.367,
+      "llm_calls": 5,
+      "llm_tokens": 2434,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 4
+        "ok": 5
       }
     },
     {
@@ -870,7 +859,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -881,13 +870,12 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 3.713,
-      "llm_calls": 4,
-      "llm_tokens": 1742,
+      "latency_seconds": 3.579,
+      "llm_calls": 3,
+      "llm_tokens": 1572,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 2
+        "ok": 3
       }
     },
     {
@@ -931,9 +919,9 @@
       "missing_evidence_items": 1,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 1.414,
+      "latency_seconds": 1.651,
       "llm_calls": 1,
-      "llm_tokens": 381,
+      "llm_tokens": 388,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
         "ok": 1
@@ -970,7 +958,7 @@
       "delegations_rejected": 0,
       "duplicate_requests_blocked": 0,
       "duplicate_tasks_executed": 0,
-      "challenges": 0,
+      "challenges": 2,
       "material_challenges": 0,
       "reinvestigation_challenges": 0,
       "reinvestigation_addressed": 0,
@@ -981,13 +969,12 @@
       "missing_evidence_items": 2,
       "contradictions_flagged": false,
       "terminated_cleanly": true,
-      "latency_seconds": 5.339,
-      "llm_calls": 6,
-      "llm_tokens": 2822,
+      "latency_seconds": 4.768,
+      "llm_calls": 5,
+      "llm_tokens": 2446,
       "llm_cost_usd": 0.0,
       "llm_status_counts": {
-        "invalid_schema": 2,
-        "ok": 4
+        "ok": 5
       }
     }
   ],
@@ -1082,14 +1069,14 @@
       "evidence_reference_validity": 1.0,
       "evidence_references": 102,
       "data_issue_discovery_recall": 1.0,
-      "challenges_raised": 14,
+      "challenges_raised": 34,
       "reinvestigation_effectiveness": 1.0,
       "terminated_cleanly": 1.0,
       "multi_round_low_risk_cases": 1,
       "mean_rounds": 1.8,
-      "mean_latency_seconds": 7.223,
-      "llm_calls": 77,
-      "llm_tokens": 38071,
+      "mean_latency_seconds": 6.307,
+      "llm_calls": 59,
+      "llm_tokens": 31688,
       "llm_cost_usd": 0.0
     },
     "scenarios": [
@@ -1126,7 +1113,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 0,
+        "challenges": 2,
         "material_challenges": 0,
         "reinvestigation_challenges": 0,
         "reinvestigation_addressed": 0,
@@ -1137,13 +1124,12 @@
         "missing_evidence_items": 0,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 3.838,
-        "llm_calls": 4,
-        "llm_tokens": 1682,
+        "latency_seconds": 3.144,
+        "llm_calls": 3,
+        "llm_tokens": 1469,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 2,
-          "ok": 2
+          "ok": 3
         }
       },
       {
@@ -1181,7 +1167,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 1,
+        "challenges": 4,
         "material_challenges": 1,
         "reinvestigation_challenges": 1,
         "reinvestigation_addressed": 1,
@@ -1192,13 +1178,12 @@
         "missing_evidence_items": 0,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 8.602,
-        "llm_calls": 8,
-        "llm_tokens": 4058,
+        "latency_seconds": 6.247,
+        "llm_calls": 6,
+        "llm_tokens": 3313,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 4
+          "ok": 6
         }
       },
       {
@@ -1241,7 +1226,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 3,
+        "challenges": 4,
         "material_challenges": 1,
         "reinvestigation_challenges": 2,
         "reinvestigation_addressed": 2,
@@ -1252,13 +1237,12 @@
         "missing_evidence_items": 2,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 7.258,
-        "llm_calls": 9,
-        "llm_tokens": 4109,
+        "latency_seconds": 9.424,
+        "llm_calls": 7,
+        "llm_tokens": 3649,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 5
+          "ok": 7
         }
       },
       {
@@ -1298,7 +1282,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 1,
+        "challenges": 4,
         "material_challenges": 0,
         "reinvestigation_challenges": 1,
         "reinvestigation_addressed": 1,
@@ -1309,13 +1293,12 @@
         "missing_evidence_items": 0,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 7.606,
-        "llm_calls": 7,
-        "llm_tokens": 3109,
+        "latency_seconds": 5.72,
+        "llm_calls": 5,
+        "llm_tokens": 2505,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 3
+          "ok": 5
         }
       },
       {
@@ -1356,7 +1339,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 2,
+        "challenges": 4,
         "material_challenges": 1,
         "reinvestigation_challenges": 2,
         "reinvestigation_addressed": 2,
@@ -1367,13 +1350,12 @@
         "missing_evidence_items": 1,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 7.572,
-        "llm_calls": 9,
-        "llm_tokens": 4297,
+        "latency_seconds": 6.864,
+        "llm_calls": 7,
+        "llm_tokens": 3734,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 5
+          "ok": 7
         }
       },
       {
@@ -1414,7 +1396,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 2,
+        "challenges": 4,
         "material_challenges": 1,
         "reinvestigation_challenges": 2,
         "reinvestigation_addressed": 2,
@@ -1425,13 +1407,12 @@
         "missing_evidence_items": 1,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 7.896,
-        "llm_calls": 9,
-        "llm_tokens": 4298,
+        "latency_seconds": 7.289,
+        "llm_calls": 7,
+        "llm_tokens": 3752,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 5
+          "ok": 7
         }
       },
       {
@@ -1468,7 +1449,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 0,
+        "challenges": 2,
         "material_challenges": 0,
         "reinvestigation_challenges": 0,
         "reinvestigation_addressed": 0,
@@ -1479,13 +1460,12 @@
         "missing_evidence_items": 0,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 4.069,
-        "llm_calls": 4,
-        "llm_tokens": 1805,
+        "latency_seconds": 3.819,
+        "llm_calls": 3,
+        "llm_tokens": 1498,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 2,
-          "ok": 2
+          "ok": 3
         }
       },
       {
@@ -1529,7 +1509,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 3,
+        "challenges": 5,
         "material_challenges": 2,
         "reinvestigation_challenges": 2,
         "reinvestigation_addressed": 2,
@@ -1540,13 +1520,12 @@
         "missing_evidence_items": 5,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 11.607,
-        "llm_calls": 12,
-        "llm_tokens": 6747,
+        "latency_seconds": 9.797,
+        "llm_calls": 9,
+        "llm_tokens": 5112,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 6,
-          "ok": 6
+          "ok": 9
         }
       },
       {
@@ -1582,7 +1561,7 @@
         "delegations_rejected": 0,
         "duplicate_requests_blocked": 0,
         "duplicate_tasks_executed": 0,
-        "challenges": 0,
+        "challenges": 2,
         "material_challenges": 0,
         "reinvestigation_challenges": 0,
         "reinvestigation_addressed": 0,
@@ -1593,13 +1572,12 @@
         "missing_evidence_items": 1,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 3.591,
-        "llm_calls": 4,
-        "llm_tokens": 1731,
+        "latency_seconds": 3.039,
+        "llm_calls": 3,
+        "llm_tokens": 1559,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 2,
-          "ok": 2
+          "ok": 3
         }
       },
       {
@@ -1642,7 +1620,7 @@
         "delegations_rejected": 1,
         "duplicate_requests_blocked": 1,
         "duplicate_tasks_executed": 0,
-        "challenges": 2,
+        "challenges": 3,
         "material_challenges": 1,
         "reinvestigation_challenges": 1,
         "reinvestigation_addressed": 1,
@@ -1653,13 +1631,12 @@
         "missing_evidence_items": 4,
         "contradictions_flagged": false,
         "terminated_cleanly": true,
-        "latency_seconds": 10.192,
-        "llm_calls": 11,
-        "llm_tokens": 6235,
+        "latency_seconds": 7.726,
+        "llm_calls": 9,
+        "llm_tokens": 5097,
         "llm_cost_usd": 0.0,
         "llm_status_counts": {
-          "invalid_schema": 4,
-          "ok": 7
+          "ok": 9
         }
       }
     ]
