@@ -1,11 +1,11 @@
 /**
  * CredX Banking API Client
- * Backend: https://credx-auwn.onrender.com
+ * Backend: https://credxapi.development.catalystappsail.in
  * Documented in backend/docs/API.md
  */
 
 // Prefer relative path in dev if Vite proxy is used, fallback to direct HTTPS URL
-export const BACKEND_URL = 'https://credx-auwn.onrender.com';
+export const BACKEND_URL = 'https://credxapi.development.catalystappsail.in';
 
 export interface UserProfile {
 	id: string;

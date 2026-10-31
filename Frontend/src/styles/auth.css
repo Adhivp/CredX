@@ -72,18 +72,33 @@
 }
 
 @keyframes floatOrb1 {
-	0%   { transform: translate(0, 0) scale(1); }
-	100% { transform: translate(45px, 65px) scale(1.08); }
+	0% {
+		transform: translate(0, 0) scale(1);
+	}
+
+	100% {
+		transform: translate(45px, 65px) scale(1.08);
+	}
 }
 
 @keyframes floatOrb2 {
-	0%   { transform: translate(0, 0) scale(1); }
-	100% { transform: translate(-50px, -45px) scale(1.12); }
+	0% {
+		transform: translate(0, 0) scale(1);
+	}
+
+	100% {
+		transform: translate(-50px, -45px) scale(1.12);
+	}
 }
 
 @keyframes floatOrb3 {
-	0%   { transform: translate(0, 0); }
-	100% { transform: translate(40px, -30px); }
+	0% {
+		transform: translate(0, 0);
+	}
+
+	100% {
+		transform: translate(40px, -30px);
+	}
 }
 
 /* 3. Left Brand Showcase Panel */
@@ -586,12 +601,12 @@
 	transition: all var(--ease-fast);
 }
 
-.custom-checkbox-container input:checked + .checkbox-visual {
+.custom-checkbox-container input:checked+.checkbox-visual {
 	background: var(--gold-500);
 	border-color: var(--gold-500);
 }
 
-.custom-checkbox-container input:checked + .checkbox-visual svg {
+.custom-checkbox-container input:checked+.checkbox-visual svg {
 	opacity: 1;
 	transform: scale(1);
 }

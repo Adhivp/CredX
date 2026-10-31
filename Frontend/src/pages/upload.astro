@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
 ---
 
 <Layout title="CredX — Upload Data">
@@ -8,8 +9,14 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
     <DashboardNav active="upload" />
     <main class="dash-main">
       <div class="dash-header">
-        <h1>Upload <span>Data</span></h1>
-        <a href="/dashboard" class="btn btn-ghost">← Back to Dashboard</a>
+        <div class="header-titles">
+          <h1 class="dash-title">Upload <span class="gold-gradient-text">Portfolio Data</span></h1>
+          <p class="dash-subtitle">Ingest customer profiles, loan facilities, and historical repayments.</p>
+        </div>
+        <div class="dash-actions">
+          <a href="/dashboard" class="btn btn-glass">← Back to Dashboard</a>
+          <OfficerProfileHeader />
+        </div>
       </div>
 
       <div class="form-group">
