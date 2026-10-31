@@ -1,6 +1,6 @@
 # CredX backend
 
-Modular FastAPI authentication starter for the CredX monorepo. Everything lives in `backend/`; no frontend or root-level project configuration is required. The backend targets Python 3.14 (`>=3.14,<3.15`); both uv and pip installations were exercised on CPython 3.14.9. `backend/.python-version` selects the 3.14 series for uv.
+Modular FastAPI authentication starter for the CredX monorepo. Application code lives in `backend/`; the optional Catalyst Docker deployment also uses root-level CI/configuration and the existing shared `core.rules` backend modules. The backend targets Python 3.14 (`>=3.14,<3.15`); both uv and pip installations were exercised on CPython 3.14.9. `backend/.python-version` selects the 3.14 series for uv.
 
 This is a development foundation, **not a production banking system**. There are no account balances, transfers, KYC, or payment APIs.
 
@@ -44,6 +44,14 @@ uv sync --locked
 uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file requirements.txt
 uv export --locked --all-groups --no-emit-project --format requirements-txt --output-file requirements-dev.txt
 ```
+
+## Zoho Catalyst Development deployment
+
+See [docs/DEPLOYMENT_CATALYST.md](docs/DEPLOYMENT_CATALYST.md) for the Python 3.14
+Docker image, GitHub Actions, required secrets/variables, actual-URL health checks,
+and SQLite/instance-lifecycle limitations. Only the backend is deployed; the
+frontend and application architecture are unchanged. This is not a production
+database deployment.
 
 ## Render deployment (Python 3.14)
 
@@ -191,4 +199,5 @@ uv run pip-audit -r requirements.txt --disable-pip --no-deps
 
 Pip equivalents: `python -m pytest -q`, `python -m ruff check .`, and `python -m pip check` inside `.venv-pip`. The locked Starlette test client uses `httpx2`, included only in development dependencies.
 
-No live bank integration, external email delivery, deployment, or frontend is configured.
+No live bank integration or external email delivery is configured. Catalyst
+Development deployment is documented above; it does not configure the frontend.
