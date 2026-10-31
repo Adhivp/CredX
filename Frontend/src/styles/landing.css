@@ -10,23 +10,6 @@
 	overflow-x: hidden;
 }
 
-/* Background Artwork — /landing.png with luxury gold & obsidian blend */
-.landing-bg-artwork {
-	position: fixed;
-	inset: 0;
-	z-index: 0;
-	pointer-events: none;
-	background-image: 
-		linear-gradient(180deg, rgba(5, 5, 5, 0.65) 0%, rgba(5, 5, 5, 0.85) 45%, rgba(5, 5, 5, 0.96) 100%),
-		radial-gradient(circle at 50% 15%, rgba(245, 197, 24, 0.15) 0%, transparent 65%),
-		url('/landing.png');
-	background-size: cover;
-	background-position: center top;
-	background-repeat: no-repeat;
-	opacity: 0.88;
-	filter: saturate(1.2) contrast(1.08);
-}
-
 /* 1. Luxury Sticky Navbar */
 .landing-nav {
 	position: sticky;
