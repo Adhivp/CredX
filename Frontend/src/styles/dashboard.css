@@ -704,3 +704,802 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ==========================================================================
+   CredX Dashboard — High-Contrast White, Black & Frosted Glassmorphism Theme
+   ========================================================================== */
+
+.dash-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #F8F9FB !important;
+  background-image:
+    radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 1) 0%, rgba(240, 242, 246, 0.9) 40%, transparent 70%),
+    radial-gradient(circle at 88% 85%, rgba(226, 232, 240, 0.6) 0%, rgba(241, 245, 249, 0.2) 50%, transparent 75%),
+    radial-gradient(ellipse at 50% 50%, #FFFFFF 0%, #F1F3F7 100%) !important;
+  color: #0A0A0A !important;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* -- Ambient Mesh for Dashboard (White Theme) -------------------------- */
+.dash-layout .ambient-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.dash-layout .mesh-orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  pointer-events: none;
+  filter: blur(110px);
+}
+
+.dash-layout .orb-primary {
+  width: 720px;
+  height: 720px;
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.22) 0%, rgba(203, 213, 225, 0.08) 45%, transparent 70%) !important;
+  top: -240px;
+  left: -120px;
+  animation: floatOrb1 22s ease-in-out infinite alternate;
+}
+
+.dash-layout .orb-secondary {
+  width: 620px;
+  height: 620px;
+  background: radial-gradient(circle, rgba(203, 213, 225, 0.3) 0%, rgba(226, 232, 240, 0.06) 50%, transparent 70%) !important;
+  bottom: -180px;
+  right: -100px;
+  animation: floatOrb2 28s ease-in-out infinite alternate;
+}
+
+.dash-layout .orb-accent {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.14) 0%, transparent 65%) !important;
+  top: 45%;
+  left: 35%;
+  animation: floatOrb3 20s ease-in-out infinite alternate;
+}
+
+.dash-layout .grid-overlay {
+  display: none !important;
+}
+
+.dash-layout .noise-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* -- Frosted Glass Sidebar Navigation ---------------------------------- */
+.dash-nav {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.03) !important;
+}
+
+.dash-nav-brand {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07) !important;
+}
+
+.brand-logo-frame {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  filter: none !important;
+}
+
+.brand-name {
+  color: #0A0A0A !important;
+}
+
+.brand-name .gold-text {
+  color: #000000 !important;
+}
+
+.brand-subtext {
+  color: #6B7280 !important;
+}
+
+.engine-status-pill {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  color: #059669 !important;
+}
+
+.engine-status-pill .pulse-dot {
+  background: #10B981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6) !important;
+}
+
+.nav-section-title {
+  color: #9CA3AF !important;
+}
+
+.nav-item {
+  color: #4B5563 !important;
+}
+
+.nav-icon-wrap {
+  color: #6B7280 !important;
+}
+
+.nav-item:hover {
+  color: #0A0A0A !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.nav-item:hover .nav-icon-wrap {
+  color: #0A0A0A !important;
+}
+
+.nav-item.active {
+  color: #FFFFFF !important;
+  background: #0A0A0A !important;
+  border-color: #000000 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+}
+
+.nav-item.active .nav-icon-wrap {
+  color: #FFFFFF !important;
+}
+
+.active-indicator {
+  background: #FFFFFF !important;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* -- Top Header & Actions ---------------------------------------------- */
+.dash-title {
+  color: #0A0A0A !important;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #0A0A0A 0%, #374151 55%, #6B7280 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.dash-subtitle {
+  color: #4B5563 !important;
+}
+
+.header-badge-row .system-pill {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  color: #059669 !important;
+}
+
+.header-date {
+  color: #6B7280 !important;
+}
+
+.header-officer-cluster {
+  border-left: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.header-officer-chip {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+.header-officer-chip:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.header-officer-chip .officer-avatar {
+  background: #0A0A0A !important;
+  border: 1px solid #000000 !important;
+  color: #FFFFFF !important;
+}
+
+.header-officer-details .officer-name {
+  color: #0A0A0A !important;
+}
+
+.header-officer-details .officer-role {
+  color: #6B7280 !important;
+}
+
+.btn-header-logout {
+  color: #4B5563 !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.btn-header-logout:hover {
+  color: #DC2626 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+/* -- Primary & Glass Buttons ------------------------------------------- */
+.btn-gold {
+  background: #0A0A0A !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  border: 1px solid #000000 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-gold:hover {
+  background: #000000 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.btn-gold:hover::before {
+  transform: translateX(100%);
+}
+
+.btn-glass {
+  background: rgba(255, 255, 255, 0.8) !important;
+  color: #0A0A0A !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.btn-glass:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.25) !important;
+  color: #000000 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* -- Frosted Glass Cards (Stat cards, Spectrum, Table, Panels) --------- */
+.stat-card,
+.risk-spectrum-panel,
+.table-card-container,
+.dossier-panel,
+.warning-signals-panel,
+.triage-console-panel,
+.filter-bar,
+.empty-state-card,
+.watchlist-card,
+.method,
+.dossier-card {
+  background: rgba(255, 255, 255, 0.76) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-top: 1px solid #FFFFFF !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02), inset 0 1px 1px #FFFFFF !important;
+  color: #0A0A0A !important;
+}
+
+.stat-card::before,
+.dossier-panel::before {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06), transparent) !important;
+}
+
+.stat-card:hover,
+.risk-spectrum-panel:hover,
+.table-card-container:hover,
+.dossier-panel:hover {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), inset 0 1px 1px #FFFFFF !important;
+}
+
+.stat-card.alert-tint {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.04) 0%, rgba(255, 255, 255, 0.8) 100%) !important;
+  border-color: rgba(249, 115, 22, 0.25) !important;
+}
+
+.stat-card-label {
+  color: #6B7280 !important;
+}
+
+.stat-main-number {
+  color: #0A0A0A !important;
+}
+
+.stat-main-number.gold-glow {
+  color: #0A0A0A !important;
+  text-shadow: none !important;
+}
+
+.stat-score-scale {
+  color: #9CA3AF !important;
+}
+
+.stat-card-footer-caption {
+  color: #6B7280 !important;
+}
+
+.stat-icon-bubble.gold {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #0A0A0A !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.stat-trend-tag.positive {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #374151 !important;
+}
+
+.stat-trend-tag.gold {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #0A0A0A !important;
+}
+
+/* -- Spectrum Panel & Category Filters --------------------------------- */
+.spectrum-eyebrow,
+.table-eyebrow,
+.panel-eyebrow {
+  color: #000000 !important;
+}
+
+.spectrum-title,
+.table-title,
+.panel-title,
+.dossier-heading {
+  color: #0A0A0A !important;
+}
+
+.spectrum-meta-badge {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #374151 !important;
+}
+
+.spectrum-bar-track {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.spectrum-cat-card {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+}
+
+.spectrum-cat-card:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
+}
+
+.spectrum-cat-card.active-filter {
+  background: #FFFFFF !important;
+  border-color: #0A0A0A !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+.cat-name {
+  color: #111827 !important;
+}
+
+.cat-count {
+  color: #0A0A0A !important;
+}
+
+.cat-pct,
+.cat-desc {
+  color: #6B7280 !important;
+}
+
+/* -- Table & Interactive Data Cells ------------------------------------ */
+.table-card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07) !important;
+}
+
+.table-search-input,
+.form-input,
+.form-select,
+.triage-textarea {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #0A0A0A !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+
+.table-search-input:focus,
+.form-input:focus,
+.form-select:focus,
+.triage-textarea:focus {
+  border-color: #0A0A0A !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.search-input-wrapper svg {
+  color: #6B7280 !important;
+}
+
+.filter-pills-group {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.filter-pill {
+  color: #4B5563 !important;
+}
+
+.filter-pill:hover {
+  color: #0A0A0A !important;
+}
+
+.filter-pill.active {
+  background: #0A0A0A !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.luxury-data-table th {
+  padding: 0.9rem 1.75rem;
+  font-size: 0.725rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #6B7280 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+.luxury-data-table td {
+  padding: 1.15rem 1.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+.table-row-clickable:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+.table-row-clickable:hover td {
+  border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.customer-avatar {
+  background: #0A0A0A !important;
+  border: 1px solid #000000 !important;
+  color: #FFFFFF !important;
+}
+
+.customer-id-badge {
+  color: #0A0A0A !important;
+}
+
+.customer-subtext {
+  color: #6B7280 !important;
+}
+
+.score-mini-bar-track {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+.score-number-text {
+  color: #0A0A0A !important;
+}
+
+.indicator-chip {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #374151 !important;
+}
+
+.chip-val {
+  color: #0A0A0A !important;
+}
+
+.action-inspect-link {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #0A0A0A !important;
+}
+
+.action-inspect-link:hover {
+  background: #0A0A0A !important;
+  color: #FFFFFF !important;
+  border-color: #000000 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* -- Dossier & Customer Detail Pages ----------------------------------- */
+.dossier-breadcrumbs {
+  color: #6B7280 !important;
+}
+
+.breadcrumb-link {
+  color: #4B5563 !important;
+}
+
+.breadcrumb-link:hover {
+  color: #0A0A0A !important;
+}
+
+.breadcrumb-current {
+  color: #0A0A0A !important;
+}
+
+.dossier-header-bar {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dossier-avatar-badge {
+  background: #0A0A0A !important;
+  border: 1.5px solid #000000 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.dossier-id-tag {
+  color: #0A0A0A !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.gauge-center-label,
+.gauge-center-scale {
+  color: #6B7280 !important;
+}
+
+.gauge-center-num {
+  color: #0A0A0A !important;
+}
+
+.demographics-wrap {
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.demographics-section-title {
+  color: #6B7280 !important;
+}
+
+.demographic-chip {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.demographic-chip:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.demographic-chip-label {
+  color: #6B7280 !important;
+}
+
+.demographic-chip-value {
+  color: #0A0A0A !important;
+}
+
+.warning-signal-card {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.warning-signal-card:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.warning-title {
+  color: #0A0A0A !important;
+}
+
+.warning-desc {
+  color: #4B5563 !important;
+}
+
+.warning-meta-row {
+  color: #6B7280 !important;
+}
+
+.ai-explanation-box {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.ai-placeholder-content {
+  color: #6B7280 !important;
+}
+
+.ai-narrative-text {
+  color: #1F2937 !important;
+}
+
+.ai-section-title {
+  color: #0A0A0A !important;
+}
+
+.ai-action-item {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #1F2937 !important;
+}
+
+.ai-action-icon {
+  color: #0A0A0A !important;
+}
+
+.triage-btn {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.08) !important;
+  color: #374151 !important;
+}
+
+.triage-btn:hover {
+  background: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+  color: #0A0A0A !important;
+}
+
+.triage-btn-sub {
+  color: #6B7280 !important;
+}
+
+.preset-chip {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #4B5563 !important;
+}
+
+.preset-chip:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #0A0A0A !important;
+}
+
+.preset-chip-label {
+  color: #6B7280 !important;
+}
+
+/* -- Upload & Watchlist Pages ------------------------------------------- */
+.upload-zone {
+  border: 2px dashed rgba(0, 0, 0, 0.18) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: #0A0A0A !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
+}
+
+.upload-zone-text {
+  color: #374151 !important;
+}
+
+.upload-zone-text strong {
+  color: #0A0A0A !important;
+}
+
+.upload-zone-hint {
+  color: #6B7280 !important;
+}
+
+.upload-card-item {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.upload-sample-btn {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #0A0A0A !important;
+}
+
+.upload-sample-btn:hover {
+  background: #0A0A0A !important;
+  color: #FFFFFF !important;
+}
+
+.watchlist-stats-bar,
+.watchlist-filter-bar {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* -- Methodology Panel ------------------------------------------------- */
+.method {
+  background: rgba(255, 255, 255, 0.76) !important;
+  backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-top: 1px solid #FFFFFF !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), inset 0 1px 1px #FFFFFF !important;
+}
+
+.method summary {
+  color: #0A0A0A !important;
+}
+
+.method-icon {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #0A0A0A !important;
+}
+
+.method-body {
+  color: #374151 !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.method h4 {
+  color: #0A0A0A !important;
+}
+
+.method-formula {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #0A0A0A !important;
+}
+
+.method-table th {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #4B5563 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.method-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #111827 !important;
+}
+
+.method-terms dt {
+  color: #0A0A0A !important;
+}
+
+.method-terms dd {
+  color: #4B5563 !important;
+}
+
+.method-card {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.method-card-title {
+  color: #0A0A0A !important;
+}
+
+.method-card-role {
+  color: #4B5563 !important;
+}
+
+/* -- Skeletons & Empty State ------------------------------------------- */
+.skeleton-card,
+.skeleton-panel {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.03) 25%, rgba(0, 0, 0, 0.07) 50%, rgba(0, 0, 0, 0.03) 75%) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.empty-state-card {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+.empty-title {
+  color: #0A0A0A !important;
+}
+
+.empty-subtitle {
+  color: #6B7280 !important;
+}

@@ -1,18 +1,24 @@
 /* ==========================================================================
    CredX Authentication Page Styles (`/`)
+   Theme: High-Contrast White, Black & Frosted Glassmorphism (Light Canvas)
    ========================================================================== */
 
-/* 1. Main Page Container */
+/* 1. Main Page Container — Luminous White Canvas */
 .auth-container {
 	display: flex;
 	min-height: 100vh;
 	width: 100%;
 	position: relative;
 	overflow: hidden;
-	background-color: var(--bg-canvas);
+	background-color: #F8F9FB;
+	background-image:
+		radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 1) 0%, rgba(240, 242, 246, 0.9) 40%, transparent 70%),
+		radial-gradient(circle at 88% 85%, rgba(226, 232, 240, 0.6) 0%, rgba(241, 245, 249, 0.2) 50%, transparent 75%),
+		radial-gradient(ellipse at 50% 50%, #FFFFFF 0%, #F1F3F7 100%);
+	color: #0A0A0A;
 }
 
-/* 2. Ambient Mesh Orbs & Texture */
+/* 2. Frosted Ambient Mesh Orbs & Texture Overlays (White Theme) */
 .ambient-mesh {
 	position: fixed;
 	inset: 0;
@@ -24,14 +30,16 @@
 .mesh-orb {
 	position: absolute;
 	border-radius: 50%;
-	filter: blur(140px);
 	will-change: transform;
+	pointer-events: none;
+	filter: blur(130px);
 }
 
+/* Default / Dark Background Mesh Orbs (used by dashboard) */
 .orb-primary {
 	width: 650px;
 	height: 650px;
-	background: radial-gradient(circle, rgba(245, 197, 24, 0.16) 0%, rgba(212, 169, 18, 0.04) 50%, transparent 75%);
+	background: radial-gradient(circle, rgba(245, 197, 24, 0.14) 0%, rgba(212, 169, 18, 0.03) 50%, transparent 75%);
 	top: -220px;
 	left: -120px;
 	animation: floatOrb1 22s ease-in-out infinite alternate;
@@ -40,7 +48,7 @@
 .orb-secondary {
 	width: 550px;
 	height: 550px;
-	background: radial-gradient(circle, rgba(245, 197, 24, 0.1) 0%, rgba(255, 217, 102, 0.03) 50%, transparent 70%);
+	background: radial-gradient(circle, rgba(245, 197, 24, 0.08) 0%, rgba(255, 217, 102, 0.02) 50%, transparent 70%);
 	bottom: -180px;
 	right: -100px;
 	animation: floatOrb2 28s ease-in-out infinite alternate;
@@ -49,22 +57,57 @@
 .orb-accent {
 	width: 420px;
 	height: 420px;
-	background: radial-gradient(circle, rgba(245, 197, 24, 0.07) 0%, transparent 70%);
+	background: radial-gradient(circle, rgba(245, 197, 24, 0.06) 0%, transparent 70%);
 	top: 45%;
 	left: 35%;
 	animation: floatOrb3 20s ease-in-out infinite alternate;
 }
 
-.grid-overlay {
-	position: absolute;
-	inset: 0;
-	background-image:
-		linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-	background-size: 56px 56px;
+.grid-overlay,
+.auth-container .grid-overlay,
+.ambient-light .grid-overlay {
+	display: none !important;
 }
 
-.noise-overlay {
+/* White Theme Ambient Mesh Overrides (Login Page & AmbientMesh theme="light") */
+.auth-container .mesh-orb,
+.ambient-light .mesh-orb {
+	filter: blur(110px);
+}
+
+.auth-container .orb-primary,
+.ambient-light .orb-primary {
+	width: 720px;
+	height: 720px;
+	background: radial-gradient(circle, rgba(148, 163, 184, 0.22) 0%, rgba(203, 213, 225, 0.08) 45%, transparent 70%);
+	top: -240px;
+	left: -120px;
+	animation: floatOrb1 22s ease-in-out infinite alternate;
+}
+
+.auth-container .orb-secondary,
+.ambient-light .orb-secondary {
+	width: 620px;
+	height: 620px;
+	background: radial-gradient(circle, rgba(203, 213, 225, 0.3) 0%, rgba(226, 232, 240, 0.06) 50%, transparent 70%);
+	bottom: -180px;
+	right: -100px;
+	animation: floatOrb2 28s ease-in-out infinite alternate;
+}
+
+.auth-container .orb-accent,
+.ambient-light .orb-accent {
+	width: 480px;
+	height: 480px;
+	background: radial-gradient(circle, rgba(148, 163, 184, 0.14) 0%, transparent 65%);
+	top: 45%;
+	left: 35%;
+	animation: floatOrb3 20s ease-in-out infinite alternate;
+}
+
+
+.auth-container .noise-overlay,
+.ambient-light .noise-overlay {
 	position: absolute;
 	inset: 0;
 	opacity: 0.025;
@@ -72,18 +115,30 @@
 }
 
 @keyframes floatOrb1 {
-	0%   { transform: translate(0, 0) scale(1); }
-	100% { transform: translate(45px, 65px) scale(1.08); }
+	0% {
+		transform: translate(0, 0) scale(1);
+	}
+	100% {
+		transform: translate(45px, 65px) scale(1.08);
+	}
 }
 
 @keyframes floatOrb2 {
-	0%   { transform: translate(0, 0) scale(1); }
-	100% { transform: translate(-50px, -45px) scale(1.12); }
+	0% {
+		transform: translate(0, 0) scale(1);
+	}
+	100% {
+		transform: translate(-50px, -45px) scale(1.12);
+	}
 }
 
 @keyframes floatOrb3 {
-	0%   { transform: translate(0, 0); }
-	100% { transform: translate(40px, -30px); }
+	0% {
+		transform: translate(0, 0);
+	}
+	100% {
+		transform: translate(40px, -30px);
+	}
 }
 
 /* 3. Left Brand Showcase Panel */
@@ -101,10 +156,18 @@
 	content: '';
 	position: absolute;
 	right: 0;
-	top: 12%;
-	bottom: 12%;
+	top: 10%;
+	bottom: 10%;
 	width: 1px;
-	background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.08) 25%, var(--gold-500) 50%, rgba(255, 255, 255, 0.08) 75%, transparent);
+	background: linear-gradient(
+		to bottom,
+		transparent,
+		rgba(0, 0, 0, 0.04) 15%,
+		rgba(0, 0, 0, 0.16) 50%,
+		rgba(0, 0, 0, 0.04) 85%,
+		transparent
+	);
+	box-shadow: 0 0 12px rgba(0, 0, 0, 0.04);
 }
 
 .showcase-content {
@@ -116,11 +179,13 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.625rem;
-	padding: 0.45rem 1rem;
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	padding: 0.45rem 1.1rem;
+	background: rgba(255, 255, 255, 0.75);
+	border: 1px solid rgba(0, 0, 0, 0.08);
 	border-radius: var(--radius-full);
-	backdrop-filter: blur(12px);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 #FFFFFF;
 	margin-bottom: 2.25rem;
 }
 
@@ -128,16 +193,16 @@
 	width: 8px;
 	height: 8px;
 	border-radius: 50%;
-	background: var(--status-success);
-	box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+	background: #10B981;
+	box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
 	animation: pulseDot 2.2s infinite;
 }
 
 .badge-text {
 	font-size: 0.8rem;
-	font-weight: 500;
-	color: var(--white-90);
-	letter-spacing: 0.03em;
+	font-weight: 600;
+	color: #111827;
+	letter-spacing: 0.05em;
 	text-transform: uppercase;
 }
 
@@ -152,7 +217,7 @@
 	width: 58px;
 	height: 58px;
 	flex-shrink: 0;
-	filter: drop-shadow(0 4px 18px rgba(245, 197, 24, 0.35));
+	filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.12));
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -168,31 +233,31 @@
 	font-family: var(--font-display);
 	font-size: 3rem;
 	font-weight: 800;
-	color: var(--white);
+	color: #0A0A0A;
 	letter-spacing: -0.03em;
 	line-height: 1;
 }
 
 .gold-accent {
-	color: var(--gold-500);
+	color: #000000;
 }
 
 .brand-headline {
 	font-size: 2rem;
 	font-weight: 300;
-	color: var(--white-75);
+	color: #374151;
 	line-height: 1.35;
 	margin-bottom: 2.75rem;
 }
 
 .headline-gradient {
-	font-weight: 700;
-	background: linear-gradient(135deg, #FFFFFF 20%, #FFE699 60%, var(--gold-500) 100%);
+	font-weight: 800;
+	background: linear-gradient(135deg, #0A0A0A 0%, #1F2937 60%, #4B5563 100%);
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 }
 
-/* Feature Highlights */
+/* Feature Highlights — Glass Cards on White */
 .feature-list {
 	display: flex;
 	flex-direction: column;
@@ -203,31 +268,39 @@
 .feature-card {
 	display: flex;
 	align-items: flex-start;
-	gap: 1rem;
-	padding: 1.1rem 1.25rem;
-	background: rgba(255, 255, 255, 0.02);
-	border: 1px solid rgba(255, 255, 255, 0.05);
+	gap: 1.15rem;
+	padding: 1.15rem 1.35rem;
+	background: rgba(255, 255, 255, 0.65);
+	backdrop-filter: blur(24px) saturate(180%);
+	-webkit-backdrop-filter: blur(24px) saturate(180%);
+	border: 1px solid rgba(255, 255, 255, 0.95);
+	border-top: 1px solid #FFFFFF;
 	border-radius: var(--radius-lg);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02), inset 0 1px 1px #FFFFFF;
 	transition: all var(--ease-base);
 }
 
 .feature-card:hover {
-	background: rgba(255, 255, 255, 0.04);
-	border-color: rgba(245, 197, 24, 0.25);
-	transform: translateX(4px);
+	background: rgba(255, 255, 255, 0.92);
+	border-color: rgba(0, 0, 0, 0.1);
+	transform: translateX(6px);
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), inset 0 1px 1px #FFFFFF;
 }
 
 .feature-icon {
 	width: 42px;
 	height: 42px;
 	border-radius: var(--radius-md);
-	background: linear-gradient(135deg, rgba(245, 197, 24, 0.16), rgba(245, 197, 24, 0.04));
-	border: 1px solid rgba(245, 197, 24, 0.25);
-	color: var(--gold-500);
+	background: rgba(0, 0, 0, 0.04);
+	backdrop-filter: blur(14px);
+	-webkit-backdrop-filter: blur(14px);
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	color: #0A0A0A;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
+	box-shadow: inset 0 1px 0 #FFFFFF;
 }
 
 .feature-icon svg {
@@ -237,14 +310,14 @@
 
 .feature-heading {
 	font-size: 1rem;
-	font-weight: 600;
-	color: var(--white);
+	font-weight: 700;
+	color: #0A0A0A;
 	margin-bottom: 0.2rem;
 }
 
 .feature-text {
 	font-size: 0.85rem;
-	color: var(--white-40);
+	color: #4B5563;
 	line-height: 1.45;
 }
 
@@ -254,7 +327,7 @@
 	align-items: center;
 	gap: 2rem;
 	padding-top: 1.75rem;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .metric-item {
@@ -266,14 +339,14 @@
 .metric-number {
 	font-family: var(--font-display);
 	font-size: 1.45rem;
-	font-weight: 700;
-	color: var(--gold-500);
+	font-weight: 800;
+	color: #0A0A0A;
 	letter-spacing: -0.01em;
 }
 
 .metric-caption {
 	font-size: 0.75rem;
-	color: var(--white-40);
+	color: #6B7280;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 }
@@ -281,10 +354,10 @@
 .metric-separator {
 	width: 1px;
 	height: 38px;
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(0, 0, 0, 0.08);
 }
 
-/* 4. Right Authentication Card */
+/* 4. Right Authentication Panel & Glass Card */
 .auth-panel {
 	flex: 1;
 	display: flex;
@@ -298,25 +371,44 @@
 .auth-card {
 	width: 100%;
 	max-width: 440px;
-	background: rgba(15, 15, 15, 0.75);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.75);
+	border: 1px solid rgba(255, 255, 255, 0.95);
+	border-top: 1px solid #FFFFFF;
 	border-radius: var(--radius-xl);
 	padding: 2.75rem 2.5rem;
-	backdrop-filter: blur(24px);
-	box-shadow: var(--shadow-card), 0 0 0 1px rgba(255, 255, 255, 0.03);
+	backdrop-filter: blur(36px) saturate(200%);
+	-webkit-backdrop-filter: blur(36px) saturate(200%);
+	box-shadow:
+		0 30px 80px rgba(0, 0, 0, 0.07),
+		0 4px 16px rgba(0, 0, 0, 0.03),
+		inset 0 1px 1px #FFFFFF,
+		inset 0 0 40px rgba(255, 255, 255, 0.8);
 	animation: fadeSlideUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 	position: relative;
+	overflow: hidden;
 }
 
 .auth-card::before {
 	content: '';
 	position: absolute;
 	top: 0;
-	left: 15%;
-	right: 15%;
+	left: 8%;
+	right: 8%;
 	height: 1px;
-	background: var(--gold-border-gradient);
-	opacity: 0.75;
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 1), transparent);
+	opacity: 0.9;
+}
+
+.auth-card::after {
+	content: '';
+	position: absolute;
+	top: -90px;
+	right: -90px;
+	width: 200px;
+	height: 200px;
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+	pointer-events: none;
 }
 
 /* Mobile Brand Header */
@@ -334,7 +426,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	filter: drop-shadow(0 2px 10px rgba(245, 197, 24, 0.3));
+	filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.1));
 }
 
 .mobile-logo-img {
@@ -347,7 +439,7 @@
 	font-family: var(--font-display);
 	font-size: 1.75rem;
 	font-weight: 800;
-	color: var(--white);
+	color: #0A0A0A;
 }
 
 .card-header {
@@ -355,27 +447,34 @@
 }
 
 .header-tag {
-	font-size: 0.75rem;
+	font-size: 0.725rem;
 	font-weight: 600;
-	color: var(--gold-500);
+	color: #111827;
+	background: rgba(0, 0, 0, 0.04);
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	padding: 0.28rem 0.8rem;
+	border-radius: var(--radius-full);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
 	text-transform: uppercase;
-	letter-spacing: 0.08em;
+	letter-spacing: 0.09em;
 	display: inline-block;
-	margin-bottom: 0.4rem;
+	margin-bottom: 0.65rem;
+	box-shadow: inset 0 1px 0 #FFFFFF;
 }
 
 .header-title {
 	font-family: var(--font-display);
 	font-size: 2.15rem;
-	font-weight: 700;
-	color: var(--white);
+	font-weight: 800;
+	color: #0A0A0A;
 	letter-spacing: -0.02em;
 	margin-bottom: 0.4rem;
 }
 
 .header-desc {
 	font-size: 0.9rem;
-	color: var(--white-40);
+	color: #4B5563;
 	line-height: 1.45;
 }
 
@@ -389,6 +488,8 @@
 	gap: 0.65rem;
 	margin-bottom: 1.25rem;
 	line-height: 1.4;
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
 	animation: fadeSlideUp 0.25s ease;
 }
 
@@ -397,18 +498,18 @@
 }
 
 .auth-alert.error {
-	background: rgba(239, 68, 68, 0.12);
-	border: 1px solid rgba(239, 68, 68, 0.35);
-	color: #FCA5A5;
+	background: rgba(239, 68, 68, 0.1);
+	border: 1px solid rgba(239, 68, 68, 0.3);
+	color: #DC2626;
 }
 
 .auth-alert.success {
-	background: rgba(34, 197, 94, 0.12);
-	border: 1px solid rgba(34, 197, 94, 0.35);
-	color: #86EFAC;
+	background: rgba(34, 197, 94, 0.1);
+	border: 1px solid rgba(34, 197, 94, 0.3);
+	color: #16A34A;
 }
 
-/* 5. Inputs & Form Controls */
+/* 5. Inputs & Form Controls (Frosted Glass on White) */
 .credential-form {
 	display: flex;
 	flex-direction: column;
@@ -429,21 +530,22 @@
 
 .field-label {
 	font-size: 0.85rem;
-	font-weight: 500;
-	color: var(--white-75);
+	font-weight: 600;
+	color: #1F2937;
 	letter-spacing: 0.01em;
 }
 
 .link-forgot {
 	font-size: 0.8rem;
 	font-weight: 500;
-	color: var(--gold-500);
+	color: #4B5563;
 	transition: color var(--ease-fast);
 }
 
 .link-forgot:hover {
-	color: var(--gold-300);
+	color: #0A0A0A;
 	text-decoration: underline;
+	text-underline-offset: 3px;
 }
 
 .field-wrapper {
@@ -457,7 +559,7 @@
 	left: 1rem;
 	width: 19px;
 	height: 19px;
-	color: var(--white-40);
+	color: #6B7280;
 	pointer-events: none;
 	transition: color var(--ease-fast);
 	display: flex;
@@ -472,12 +574,15 @@
 .text-input {
 	width: 100%;
 	padding: 0.875rem 1rem 0.875rem 3rem;
-	background: rgba(22, 22, 22, 0.8);
-	border: 1px solid var(--border-medium);
+	background: rgba(255, 255, 255, 0.85);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid rgba(0, 0, 0, 0.12);
 	border-radius: var(--radius-md);
-	color: var(--white);
+	color: #0A0A0A;
 	font-size: 0.95rem;
 	transition: all var(--ease-fast);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .text-input.has-toggle {
@@ -485,29 +590,31 @@
 }
 
 .text-input::placeholder {
-	color: var(--white-40);
+	color: #9CA3AF;
 }
 
 .text-input:hover {
-	border-color: rgba(255, 255, 255, 0.2);
-	background: rgba(30, 30, 30, 0.9);
+	border-color: rgba(0, 0, 0, 0.28);
+	background: #FFFFFF;
 }
 
 .text-input:focus {
-	border-color: var(--gold-500);
-	background: rgba(30, 30, 30, 0.95);
-	box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.2);
+	border-color: #0A0A0A;
+	background: #FFFFFF;
+	box-shadow:
+		0 0 0 3px rgba(0, 0, 0, 0.08),
+		0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 .field-wrapper:has(.text-input:focus) .field-icon {
-	color: var(--gold-500);
+	color: #0A0A0A;
 }
 
 .password-toggle-btn {
 	position: absolute;
 	right: 0.85rem;
 	background: transparent;
-	color: var(--white-40);
+	color: #6B7280;
 	padding: 0.35rem;
 	display: flex;
 	align-items: center;
@@ -517,7 +624,7 @@
 }
 
 .password-toggle-btn:hover {
-	color: var(--white);
+	color: #0A0A0A;
 }
 
 .password-toggle-btn svg {
@@ -567,48 +674,52 @@
 .checkbox-visual {
 	width: 18px;
 	height: 18px;
-	border: 1.5px solid rgba(255, 255, 255, 0.25);
+	border: 1.5px solid rgba(0, 0, 0, 0.25);
 	border-radius: 4px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	transition: all var(--ease-fast);
 	flex-shrink: 0;
-	background: rgba(255, 255, 255, 0.03);
+	background: rgba(255, 255, 255, 0.8);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
 }
 
 .checkbox-visual svg {
 	width: 11px;
 	height: 11px;
-	color: #0A0A0A;
+	color: #FFFFFF;
 	opacity: 0;
 	transform: scale(0.6);
 	transition: all var(--ease-fast);
 }
 
-.custom-checkbox-container input:checked + .checkbox-visual {
-	background: var(--gold-500);
-	border-color: var(--gold-500);
+.custom-checkbox-container input:checked+.checkbox-visual {
+	background: #0A0A0A;
+	border-color: #0A0A0A;
+	box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
 }
 
-.custom-checkbox-container input:checked + .checkbox-visual svg {
+.custom-checkbox-container input:checked+.checkbox-visual svg {
 	opacity: 1;
 	transform: scale(1);
 }
 
 .checkbox-caption {
 	font-size: 0.825rem;
-	color: var(--white-75);
+	color: #374151;
 }
 
-/* 6. Primary Action Button */
+/* 6. Primary Action Button — High Contrast Jet Black on White Canvas */
 .primary-btn {
 	width: 100%;
 	padding: 0.95rem 1.5rem;
-	background: var(--gold-gradient);
-	color: #0A0A0A;
-	font-size: 1rem;
+	background: #0A0A0A;
+	color: #FFFFFF;
+	font-size: 0.95rem;
 	font-weight: 700;
+	letter-spacing: 0.01em;
 	border-radius: var(--radius-md);
 	display: flex;
 	align-items: center;
@@ -617,23 +728,29 @@
 	position: relative;
 	overflow: hidden;
 	transition: all var(--ease-base);
-	box-shadow: var(--shadow-gold);
+	box-shadow:
+		0 4px 16px rgba(0, 0, 0, 0.15),
+		0 2px 4px rgba(0, 0, 0, 0.1);
 	margin-top: 0.35rem;
+	border: 1px solid #000000;
+	cursor: pointer;
 }
 
 .primary-btn::before {
 	content: '';
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
 	transform: translateX(-100%);
 	transition: transform 0.6s ease;
 }
 
 .primary-btn:hover {
 	transform: translateY(-2px);
-	background: var(--gold-gradient-hover);
-	box-shadow: var(--shadow-gold-lg);
+	background: #000000;
+	box-shadow:
+		0 8px 24px rgba(0, 0, 0, 0.25),
+		0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .primary-btn:hover::before {
@@ -642,6 +759,7 @@
 
 .primary-btn:active {
 	transform: translateY(0);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-arrow-icon {
@@ -685,14 +803,14 @@
 .divider-line {
 	flex: 1;
 	height: 1px;
-	background: var(--border-medium);
+	background: rgba(0, 0, 0, 0.1);
 }
 
 .divider-label {
 	font-size: 0.775rem;
-	color: var(--white-40);
+	color: #6B7280;
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.06em;
 	white-space: nowrap;
 }
 
@@ -708,44 +826,49 @@
 	justify-content: center;
 	gap: 0.6rem;
 	padding: 0.75rem 1rem;
-	background: rgba(255, 255, 255, 0.035);
-	border: 1px solid var(--border-medium);
+	background: rgba(255, 255, 255, 0.75);
+	backdrop-filter: blur(14px);
+	-webkit-backdrop-filter: blur(14px);
+	border: 1px solid rgba(0, 0, 0, 0.1);
 	border-radius: var(--radius-md);
-	color: var(--white-90);
+	color: #1F2937;
 	font-size: 0.85rem;
-	font-weight: 500;
+	font-weight: 600;
 	transition: all var(--ease-fast);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), inset 0 1px 0 #FFFFFF;
 }
 
 .sso-btn:hover {
-	background: rgba(255, 255, 255, 0.08);
-	border-color: var(--white-20);
-	color: var(--white);
+	background: #FFFFFF;
+	border-color: rgba(0, 0, 0, 0.22);
+	color: #0A0A0A;
 	transform: translateY(-1px);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 .account-prompt {
 	text-align: center;
 	margin-top: 1.75rem;
 	font-size: 0.875rem;
-	color: var(--white-40);
+	color: #4B5563;
 }
 
 .link-gold {
-	color: var(--gold-500);
-	font-weight: 600;
-	transition: color var(--ease-fast);
+	color: #0A0A0A;
+	font-weight: 700;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	transition: opacity var(--ease-fast);
 }
 
 .link-gold:hover {
-	color: var(--gold-300);
-	text-decoration: underline;
+	opacity: 0.75;
 }
 
 .card-footer {
 	margin-top: 2rem;
 	padding-top: 1.25rem;
-	border-top: 1px solid rgba(255, 255, 255, 0.06);
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
 	text-align: center;
 	display: flex;
 	flex-direction: column;
@@ -758,11 +881,11 @@
 	justify-content: center;
 	gap: 0.4rem;
 	font-size: 0.75rem;
-	color: var(--white-40);
+	color: #6B7280;
 }
 
 .compliance-row svg {
-	color: var(--gold-500);
+	color: #111827;
 }
 
 .legal-nav {
@@ -774,19 +897,35 @@
 }
 
 .legal-nav a {
-	color: var(--white-40);
+	color: #6B7280;
 	transition: color var(--ease-fast);
 }
 
 .legal-nav a:hover {
-	color: var(--gold-500);
+	color: #0A0A0A;
 }
 
 .nav-bullet {
-	color: var(--white-20);
+	color: rgba(0, 0, 0, 0.2);
 }
 
-/* 8. Responsive Breakpoints */
+/* 8. Scoped Overrides for Brand Logo in Login Page */
+.auth-container .logo-title {
+	color: #0A0A0A !important;
+}
+
+.auth-container .gold-text {
+	color: #000000 !important;
+	text-shadow: none !important;
+}
+
+.auth-container .logo-emblem-wrap,
+.auth-container .brand-emblem,
+.auth-container .mobile-logo-mark {
+	filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.12)) !important;
+}
+
+/* 9. Responsive Breakpoints */
 @media (max-width: 1024px) {
 	.brand-showcase {
 		display: none;

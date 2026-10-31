@@ -1,27 +1,35 @@
 ---
 interface Props {
-	size?: 'sm' | 'md' | 'lg';
+	size?: "sm" | "md" | "lg";
 	showText?: boolean;
 }
 
-const { size = 'md', showText = true } = Astro.props;
+const { size = "md", showText = true } = Astro.props;
 
 const dimensions = {
-	sm: { width: 34, height: 34, textSize: '1.4rem' },
-	md: { width: 48, height: 48, textSize: '2.1rem' },
-	lg: { width: 62, height: 62, textSize: '2.8rem' },
+	sm: { width: 34, height: 34, textSize: "1.4rem" },
+	md: { width: 48, height: 48, textSize: "2.1rem" },
+	lg: { width: 62, height: 62, textSize: "2.8rem" },
 }[size];
 ---
 
 <div class={`brand-logo-component size-${size}`}>
-	<div class="logo-emblem-wrap" style={`width: ${dimensions.width}px; height: ${dimensions.height}px;`}>
+	<div
+		class="logo-emblem-wrap"
+		style={`width: ${dimensions.width}px; height: ${dimensions.height}px;`}
+	>
 		<img src="/logo.png" alt="CredX Emblem" class="logo-image" />
 	</div>
-	{showText && (
-		<span class="logo-title" style={`font-size: ${dimensions.textSize};`}>
-			Cred<span class="gold-text">X</span>
-		</span>
-	)}
+	{
+		showText && (
+			<span
+				class="logo-title"
+				style={`font-size: ${dimensions.textSize};`}
+			>
+				Cred<span class="gold-text">X</span>
+			</span>
+		)
+	}
 </div>
 
 <style>
@@ -54,12 +62,12 @@ const dimensions = {
 	.logo-title {
 		font-family: var(--font-display);
 		font-weight: 800;
-		color: var(--white);
+		color: var(--logo-title-color, var(--text-primary));
 		letter-spacing: -0.03em;
 		line-height: 1;
 	}
 
 	.gold-text {
-		color: var(--gold-500);
+		color: var(--logo-accent-color, var(--text-accent));
 	}
 </style>

@@ -1,11 +1,18 @@
 ---
-// Reusable ambient background with gold glowing mesh orbs and texture overlays
+// Reusable ambient background with glowing mesh orbs and texture overlays
+interface Props {
+	theme?: "light" | "dark" | "auto";
+}
+
+const { theme = "auto" } = Astro.props;
 ---
 
-<div class="ambient-mesh" aria-hidden="true">
+<div
+	class={`ambient-mesh ${theme !== "auto" ? `ambient-${theme}` : ""}`}
+	aria-hidden="true"
+>
 	<div class="mesh-orb orb-primary"></div>
 	<div class="mesh-orb orb-secondary"></div>
 	<div class="mesh-orb orb-accent"></div>
-	<div class="grid-overlay"></div>
 	<div class="noise-overlay"></div>
 </div>
