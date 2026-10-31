@@ -3,16 +3,16 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	output: 'static',
+	output: 'server',
 	vite: {
 		server: {
 			proxy: {
 				'/api': {
-					target: 'https://credxapi.development.catalystappsail.in/',
+					target: 'http://localhost:8000',
 					changeOrigin: true,
 				},
 				'/health': {
-					target: 'https://credxapi.development.catalystappsail.in/',
+					target: 'http://localhost:8000',
 					changeOrigin: true,
 				},
 			},
