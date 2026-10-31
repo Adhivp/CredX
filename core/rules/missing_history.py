@@ -1,14 +1,29 @@
 """
 Rule 4: Missing or Incomplete Customer History Detection
-Identifies customers with insufficient data for risk assessment.
-Distinguishes between genuinely new customers and data gaps.
-Does NOT flag missing data as high risk — flags as "insufficient information".
+
+Thresholds derived from Home Credit dataset (307,511 customers).
+Baseline default rate: 8.07%.
+
+Key insight: missing data does NOT automatically mean higher risk.
+  No instalment history → 5.98% default (LOWER than baseline — new customers)
+  No bureau history → 10.12% default (1.25x baseline — data gap is a concern)
+  Both inst+bureau → 7.84% default (below baseline — full picture helps)
+
+Data availability across the dataset:
+  94.8% have instalment records, 85.7% bureau, 28.3% credit card, 94.1% POS cash.
+  Common missing fields: EXT_SOURCE_1 (56%), OWN_CAR_AGE (66%), OCCUPATION_TYPE (31%).
+
+Completeness thresholds:
+  COMPLETE (≥75):    has instalment + bureau + ≥12 records → full assessment possible
+  ADEQUATE (50-74):  has instalment + ≥6 records → reliable pattern analysis
+  PARTIAL (25-49):   some data but <6 records or missing bureau
+  INSUFFICIENT (<25): <3 records or no instalment history
 """
 
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional
 from enum import Enum
 
 
@@ -44,7 +59,6 @@ class MissingHistorySignal:
     indicators: List[str]
 
 
-# Minimum data requirements for risk assessment
 REQUIRED_FIELDS = {
     "customer_profile": ["customer_id", "customer_type"],
     "loan_info": ["loan_id", "sanctioned_amount", "outstanding_balance"],
@@ -57,7 +71,10 @@ RECOMMENDED_FIELDS = {
     "delinquency_data": ["dpd"],
 }
 
+# From Home Credit: P10 = 7 records, P25 = 12, P50 = 25
 MIN_REPAYMENT_RECORDS = 3
+MIN_RECORDS_FOR_ADEQUATE = 6
+MIN_RECORDS_FOR_COMPLETE = 12
 MIN_MONTHS_FOR_ADEQUATE = 6
 MIN_MONTHS_FOR_COMPLETE = 12
 
@@ -113,9 +130,9 @@ def detect_missing_history(
         rep_hist = repayment_by_customer.get(cid, pd.DataFrame())
         loans = loan_by_customer.get(cid, pd.DataFrame())
         income = income_by_customer.get(cid, pd.DataFrame())
-        exposure = loan_by_customer.get(cid, pd.DataFrame())
+        exposure_df = loan_by_customer.get(cid, pd.DataFrame())
 
-        signal = _assess_completeness(cid, profile, rep_hist, loans, income, exposure, reference_date)
+        signal = _assess_completeness(cid, profile, rep_hist, loans, income, exposure_df, reference_date)
         results[cid] = signal
 
     return results
@@ -134,14 +151,12 @@ def _assess_completeness(
     missing_fields = []
     available_fields = []
 
-    # --- Check required fields in profile ---
     for field in ["customer_id", "customer_type"]:
         if field in profile.index and pd.notna(profile[field]):
             available_fields.append(f"profile.{field}")
         else:
             missing_fields.append(f"profile.{field}")
 
-    # --- Repayment history assessment ---
     repayment_records_count = len(repayment_hist)
     months_of_history = 0
 
@@ -159,7 +174,6 @@ def _assess_completeness(
     else:
         missing_fields.append("repayment_history")
 
-    # --- Loan data ---
     has_loan_data = not loan_data.empty if isinstance(loan_data, pd.DataFrame) else False
     if has_loan_data:
         available_fields.append("loan_facilities")
@@ -171,14 +185,12 @@ def _assess_completeness(
     else:
         missing_fields.append("loan_facilities")
 
-    # --- Income data ---
     has_income_data = not income_data.empty if isinstance(income_data, pd.DataFrame) else False
     if has_income_data:
         available_fields.append("income_data")
     else:
         missing_fields.append("income_data")
 
-    # --- Exposure data ---
     has_exposure_data = False
     if has_loan_data:
         if "credit_limit" in loan_data.columns and loan_data["credit_limit"].notna().any():
@@ -191,7 +203,6 @@ def _assess_completeness(
     if not has_exposure_data:
         missing_fields.append("exposure_data")
 
-    # --- Delinquency data ---
     has_delinquency_data = False
     if repayment_records_count > 0 and "dpd" in repayment_hist.columns:
         if repayment_hist["dpd"].notna().any():
@@ -201,13 +212,11 @@ def _assess_completeness(
     if not has_delinquency_data:
         missing_fields.append("delinquency.dpd")
 
-    # --- Data staleness ---
     data_staleness_days = 0
     if repayment_records_count > 0:
         latest_record = pd.to_datetime(repayment_hist["due_date"]).max()
         data_staleness_days = (reference_date - latest_record).days
 
-    # --- Determine customer data type ---
     onboarding_date = None
     if "onboarding_date" in profile.index and pd.notna(profile.get("onboarding_date")):
         onboarding_date = pd.to_datetime(profile["onboarding_date"])
@@ -216,20 +225,27 @@ def _assess_completeness(
         months_of_history, repayment_records_count, data_staleness_days, onboarding_date, reference_date
     )
 
-    # --- Build indicators ---
+    # --- Indicators backed by data ---
     if repayment_records_count == 0:
+        # No-instalment customers → 5.98% default (actually LOWER than baseline)
         indicators.append("No repayment history available — cannot assess repayment behaviour")
     elif repayment_records_count < MIN_REPAYMENT_RECORDS:
-        indicators.append(f"Only {repayment_records_count} repayment records — insufficient for pattern analysis")
+        # Records 1-3 → 8.25% default — at baseline but insufficient for pattern detection
+        indicators.append(f"Only {repayment_records_count} repayment records — insufficient for pattern analysis (minimum {MIN_REPAYMENT_RECORDS})")
+
+    # P25 = 12 records; <6 records is bottom decile
+    if 0 < repayment_records_count < MIN_RECORDS_FOR_ADEQUATE:
+        indicators.append(f"Only {repayment_records_count} records — below P10 threshold of 7 for reliable analysis")
 
     if months_of_history < MIN_MONTHS_FOR_ADEQUATE and months_of_history > 0:
-        indicators.append(f"Only {months_of_history} months of history — less than {MIN_MONTHS_FOR_ADEQUATE} month minimum for adequate assessment")
+        indicators.append(f"Only {months_of_history} months of history — less than {MIN_MONTHS_FOR_ADEQUATE} months for adequate assessment")
 
     if not has_income_data:
         indicators.append("No income data available — cannot calculate debt-to-income ratio")
 
-    if not has_exposure_data:
-        indicators.append("No credit limit/utilisation data — cannot assess exposure levels")
+    # 71.7% of customers lack credit card data — this is normal, not a gap
+    if not has_exposure_data and has_loan_data:
+        indicators.append("No credit limit/utilisation data — exposure assessment limited to loan balances")
 
     if not has_delinquency_data:
         indicators.append("No DPD data available — delinquency assessment limited")
@@ -240,16 +256,17 @@ def _assess_completeness(
         indicators.append(f"Last data point is {data_staleness_days} days ago")
 
     if customer_data_type == CustomerDataType.NEW_CUSTOMER:
-        indicators.append("New customer — limited history expected, not a deterioration signal")
+        # No-instalment default = 5.98% — lower than baseline; do NOT inflate risk
+        indicators.append("New customer — limited history expected, not a deterioration signal (default rate 5.98% — below baseline)")
     elif customer_data_type == CustomerDataType.DATA_GAP:
-        indicators.append("Established customer with missing data — possible data quality issue")
+        # No-bureau default = 10.12% — 1.25x baseline; data gap IS concerning
+        indicators.append("Established customer with missing data — possible data quality issue (no-bureau default rate 10.12%)")
     elif customer_data_type == CustomerDataType.STALE_DATA:
         indicators.append("Data appears stale — recent activity may not be captured")
 
     if len(missing_fields) == 0:
         indicators.append("All required and recommended data fields are available")
 
-    # --- Completeness score (higher = more complete) ---
     completeness_score = _calculate_completeness_score(
         repayment_records_count=repayment_records_count,
         months_of_history=months_of_history,
@@ -303,7 +320,8 @@ def _determine_data_type(
     if months_of_history < 3 and repayment_records > 0:
         return CustomerDataType.NEW_CUSTOMER
 
-    if months_of_history > 6 and repayment_records < 3:
+    # Established customer (>6 months) with very few records is a data gap
+    if months_of_history > 6 and repayment_records < MIN_REPAYMENT_RECORDS:
         return CustomerDataType.DATA_GAP
 
     return CustomerDataType.NORMAL
@@ -319,37 +337,55 @@ def _calculate_completeness_score(
     data_staleness_days: int,
     missing_field_count: int,
 ) -> float:
+    """
+    Completeness score 0-100 (higher = more complete).
+
+    Weights derived from Home Credit data availability and impact:
+      - Repayment history depth (35%): most important for EWS.
+        P10=7, P25=12, P50=25 records. ≥12 records (P25) = full credit.
+        Records 24+ → 7.65% default (best assessment quality).
+      - Bureau/loan data availability (20%): 85.7% have bureau data.
+        No bureau → 10.12% default — missing bureau is a concern.
+      - History duration (15%): months of observation.
+      - Income data (10%): available for ~100% in Home Credit.
+      - Data freshness (10%): stale data reduces confidence.
+      - Field coverage (10%): completeness of individual fields.
+    """
     score = 0.0
 
-    # Repayment history depth (weight: 30%)
-    if repayment_records_count >= 12:
-        score += 30
-    elif repayment_records_count >= 6:
-        score += 20
-    elif repayment_records_count >= 3:
-        score += 12
+    # Repayment history depth (weight: 35%)
+    # P10=7, P25=12, P50=25 records
+    if repayment_records_count >= MIN_RECORDS_FOR_COMPLETE:  # ≥12 — at P25
+        score += 35
+    elif repayment_records_count >= MIN_RECORDS_FOR_ADEQUATE:  # ≥6
+        score += 24
+    elif repayment_records_count >= MIN_REPAYMENT_RECORDS:  # ≥3
+        score += 14
     elif repayment_records_count >= 1:
         score += 5
 
-    # History duration (weight: 20%)
-    if months_of_history >= 12:
-        score += 20
-    elif months_of_history >= 6:
-        score += 14
-    elif months_of_history >= 3:
-        score += 8
-    elif months_of_history >= 1:
-        score += 3
-
-    # Data availability (weight: 30%)
+    # Bureau/loan data (weight: 20%)
+    # 85.7% have bureau; no-bureau → 10.12% default (1.25x baseline)
     if has_loan_data:
-        score += 8
-    if has_income_data:
-        score += 8
+        score += 12
     if has_exposure_data:
+        score += 8
+
+    # History duration (weight: 15%)
+    if months_of_history >= MIN_MONTHS_FOR_COMPLETE:
+        score += 15
+    elif months_of_history >= MIN_MONTHS_FOR_ADEQUATE:
+        score += 10
+    elif months_of_history >= 3:
+        score += 6
+    elif months_of_history >= 1:
+        score += 2
+
+    # Income data (weight: 10%)
+    if has_income_data:
         score += 7
     if has_delinquency_data:
-        score += 7
+        score += 3
 
     # Data freshness (weight: 10%)
     if data_staleness_days <= 7:
@@ -371,6 +407,13 @@ def _calculate_completeness_score(
 
 
 def _score_to_completeness(score: float) -> DataCompleteness:
+    """
+    Completeness thresholds:
+      COMPLETE (≥75):     has instalment + bureau + ≥12 records
+      ADEQUATE (50-74):   has instalment + ≥6 records
+      PARTIAL (25-49):    some data but <6 records or missing bureau
+      INSUFFICIENT (<25): <3 records or no instalment history
+    """
     if score >= 75:
         return DataCompleteness.COMPLETE
     elif score >= 50:
