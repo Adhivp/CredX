@@ -379,6 +379,35 @@
 	line-height: 1.45;
 }
 
+/* Authentication Feedback Alert */
+.auth-alert {
+	padding: 0.85rem 1rem;
+	border-radius: var(--radius-md);
+	font-size: 0.85rem;
+	display: none;
+	align-items: center;
+	gap: 0.65rem;
+	margin-bottom: 1.25rem;
+	line-height: 1.4;
+	animation: fadeSlideUp 0.25s ease;
+}
+
+.auth-alert.visible {
+	display: flex;
+}
+
+.auth-alert.error {
+	background: rgba(239, 68, 68, 0.12);
+	border: 1px solid rgba(239, 68, 68, 0.35);
+	color: #FCA5A5;
+}
+
+.auth-alert.success {
+	background: rgba(34, 197, 94, 0.12);
+	border: 1px solid rgba(34, 197, 94, 0.35);
+	color: #86EFAC;
+}
+
 /* 5. Inputs & Form Controls */
 .credential-form {
 	display: flex;

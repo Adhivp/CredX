@@ -11,13 +11,51 @@ import BrandLogo from '../common/BrandLogo.astro';
 
 		<!-- Card Header -->
 		<header class="card-header">
-			<span class="header-tag">Client Portal</span>
-			<h2 class="header-title">Welcome back</h2>
-			<p class="header-desc">Enter your credentials to securely access your account</p>
+			<span class="header-tag" id="auth-mode-tag">Client Portal</span>
+			<h2 class="header-title" id="auth-title">Welcome back</h2>
+			<p class="header-desc" id="auth-desc">Enter your credentials to securely access your account</p>
 		</header>
 
-		<!-- Login Form -->
+		<!-- Real-time Feedback Banner -->
+		<div class="auth-alert" id="auth-alert" role="alert">
+			<svg id="alert-icon-error" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10"/>
+				<line x1="12" y1="8" x2="12" y2="12"/>
+				<line x1="12" y1="16" x2="12.01" y2="16"/>
+			</svg>
+			<svg id="alert-icon-success" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+				<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+				<polyline points="22 4 12 14.01 9 11.01"/>
+			</svg>
+			<span id="auth-alert-message"></span>
+		</div>
+
+		<!-- Login & Registration Form -->
 		<form class="credential-form" id="login-form" novalidate>
+			<!-- Full Name (Only visible in registration mode) -->
+			<div class="field-group" id="name-field-group" style="display: none;">
+				<div class="field-label-row">
+					<label for="full_name" class="field-label">Full Name</label>
+				</div>
+				<div class="field-wrapper">
+					<span class="field-icon">
+						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75">
+							<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+							<circle cx="12" cy="7" r="4"/>
+						</svg>
+					</span>
+					<input
+						type="text"
+						id="full_name"
+						name="full_name"
+						class="text-input"
+						placeholder="Alexander Vance"
+						autocomplete="name"
+					/>
+				</div>
+				<span class="field-error-msg" id="name-error-msg"></span>
+			</div>
+
 			<!-- Email Address -->
 			<div class="field-group" id="email-field-group">
 				<div class="field-label-row">
@@ -80,7 +118,7 @@ import BrandLogo from '../common/BrandLogo.astro';
 			</div>
 
 			<!-- Options: Remember Device -->
-			<div class="form-checkbox-row">
+			<div class="form-checkbox-row" id="remember-row">
 				<label class="custom-checkbox-container" id="remember-device-label">
 					<input type="checkbox" id="remember" name="remember" checked />
 					<span class="checkbox-visual">
@@ -92,9 +130,9 @@ import BrandLogo from '../common/BrandLogo.astro';
 				</label>
 			</div>
 
-			<!-- Primary Sign In Button -->
+			<!-- Primary Submit Button -->
 			<button type="submit" class="primary-btn" id="btn-login">
-				<span class="btn-text">Sign In to CredX</span>
+				<span class="btn-text" id="btn-text">Sign In to CredX</span>
 				<span class="btn-spinner" style="display: none;">
 					<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
 						<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="60" stroke-dashoffset="20"/>
@@ -107,6 +145,12 @@ import BrandLogo from '../common/BrandLogo.astro';
 				</span>
 			</button>
 		</form>
+
+		<!-- Mode Switcher -->
+		<p class="account-prompt">
+			<span id="account-prompt-text">New to CredX?</span>
+			<a href="#register" class="link-gold" id="toggle-auth-mode">Open a private account</a>
+		</p>
 
 		<!-- Alternative Login Divider -->
 		<div class="auth-divider">
@@ -135,11 +179,6 @@ import BrandLogo from '../common/BrandLogo.astro';
 			</button>
 		</div>
 
-		<!-- Registration Prompt -->
-		<p class="account-prompt">
-			New to CredX? <a href="#register" class="link-gold" id="register-link">Open a private account</a>
-		</p>
-
 		<!-- Security Badging & Legal Footer -->
 		<footer class="card-footer">
 			<div class="compliance-row">
@@ -147,7 +186,7 @@ import BrandLogo from '../common/BrandLogo.astro';
 					<rect x="3" y="11" width="18" height="11" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
 					<path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-linecap="round" stroke-linejoin="round"/>
 				</svg>
-				<span>End-to-End Encrypted Session</span>
+				<span>Connected to https://credx-auwn.onrender.com</span>
 			</div>
 			<div class="legal-nav">
 				<a href="#privacy">Privacy</a>
@@ -161,16 +200,70 @@ import BrandLogo from '../common/BrandLogo.astro';
 </section>
 
 <script>
+	import { api } from '../../lib/api';
+
 	document.addEventListener('DOMContentLoaded', () => {
 		const form = document.getElementById('login-form') as HTMLFormElement | null;
+		const nameFieldGroup = document.getElementById('name-field-group');
+		const nameInput = document.getElementById('full_name') as HTMLInputElement | null;
 		const emailInput = document.getElementById('email') as HTMLInputElement | null;
 		const passwordInput = document.getElementById('password') as HTMLInputElement | null;
 		const toggleBtn = document.getElementById('toggle-password') as HTMLButtonElement | null;
 		const btnLogin = document.getElementById('btn-login') as HTMLButtonElement | null;
-		const ssoGoogle = document.getElementById('sso-google') as HTMLButtonElement | null;
-		const ssoApple = document.getElementById('sso-apple') as HTMLButtonElement | null;
+		const btnText = document.getElementById('btn-text');
+		const toggleAuthMode = document.getElementById('toggle-auth-mode');
+		const authModeTag = document.getElementById('auth-mode-tag');
+		const authTitle = document.getElementById('auth-title');
+		const authDesc = document.getElementById('auth-desc');
+		const promptText = document.getElementById('account-prompt-text');
+		const alertBanner = document.getElementById('auth-alert');
+		const alertMessage = document.getElementById('auth-alert-message');
+		const alertIconError = document.getElementById('alert-icon-error');
+		const alertIconSuccess = document.getElementById('alert-icon-success');
 
-		// 1. Password Visibility Toggle
+		let isRegisterMode = false;
+
+		function showAlert(message: string, isError = true) {
+			if (!alertBanner || !alertMessage) return;
+			alertBanner.className = `auth-alert visible ${isError ? 'error' : 'success'}`;
+			alertMessage.textContent = message;
+			if (alertIconError) alertIconError.style.display = isError ? 'block' : 'none';
+			if (alertIconSuccess) alertIconSuccess.style.display = isError ? 'none' : 'block';
+		}
+
+		function hideAlert() {
+			if (!alertBanner) return;
+			alertBanner.className = 'auth-alert';
+		}
+
+		// Switch between Login and Registration mode
+		toggleAuthMode?.addEventListener('click', (e) => {
+			e.preventDefault();
+			isRegisterMode = !isRegisterMode;
+			hideAlert();
+
+			if (isRegisterMode) {
+				if (nameFieldGroup) nameFieldGroup.style.display = 'flex';
+				if (authModeTag) authModeTag.textContent = 'Account Application';
+				if (authTitle) authTitle.textContent = 'Open an Account';
+				if (authDesc) authDesc.textContent = 'Create your private banking credentials (password: 12+ chars)';
+				if (btnText) btnText.textContent = 'Create CredX Account';
+				if (promptText) promptText.textContent = 'Already have an account?';
+				if (toggleAuthMode) toggleAuthMode.textContent = 'Sign In';
+				if (passwordInput) passwordInput.placeholder = 'Min 12 characters';
+			} else {
+				if (nameFieldGroup) nameFieldGroup.style.display = 'none';
+				if (authModeTag) authModeTag.textContent = 'Client Portal';
+				if (authTitle) authTitle.textContent = 'Welcome back';
+				if (authDesc) authDesc.textContent = 'Enter your credentials to securely access your account';
+				if (btnText) btnText.textContent = 'Sign In to CredX';
+				if (promptText) promptText.textContent = 'New to CredX?';
+				if (toggleAuthMode) toggleAuthMode.textContent = 'Open a private account';
+				if (passwordInput) passwordInput.placeholder = 'Enter your security password';
+			}
+		});
+
+		// Password Visibility Toggle
 		if (toggleBtn && passwordInput) {
 			toggleBtn.addEventListener('click', () => {
 				const isPassword = passwordInput.type === 'password';
@@ -186,83 +279,117 @@ import BrandLogo from '../common/BrandLogo.astro';
 			});
 		}
 
-		// 2. Realtime Error Clearing
+		// Realtime Error Clearing
+		nameInput?.addEventListener('input', () => {
+			document.getElementById('name-field-group')?.classList.remove('has-error');
+			hideAlert();
+		});
+
 		emailInput?.addEventListener('input', () => {
 			document.getElementById('email-field-group')?.classList.remove('has-error');
+			hideAlert();
 		});
 
 		passwordInput?.addEventListener('input', () => {
 			document.getElementById('password-field-group')?.classList.remove('has-error');
+			hideAlert();
 		});
 
-		// 3. Authenticate and redirect to landing page
-		function handleSuccessfulAuth(email: string) {
-			if (!btnLogin) return;
-			btnLogin.classList.add('is-loading');
-			btnLogin.disabled = true;
-
-			// Save authenticated session state
-			const userSession = {
-				email: email || 'client@credx.com',
-				name: 'Alexander Vance',
-				tier: 'Private Wealth Black',
-				accountNumber: 'CX-8842-9901',
-				loginTime: new Date().toISOString(),
-			};
-			sessionStorage.setItem('credx_user', JSON.stringify(userSession));
-
-			// Simulated secure cryptographic handshake before redirecting to landing page
-			setTimeout(() => {
-				window.location.href = '/landing';
-			}, 900);
-		}
-
-		form?.addEventListener('submit', (e: Event) => {
+		// Submit Handler with Backend API integration
+		form?.addEventListener('submit', async (e: Event) => {
 			e.preventDefault();
+			hideAlert();
 			let isValid = true;
 
+			const nameVal = nameInput?.value.trim() ?? '';
+			const emailVal = emailInput?.value.trim() ?? '';
+			const passwordVal = passwordInput?.value ?? '';
+
+			const nameGroup = document.getElementById('name-field-group');
+			const nameError = document.getElementById('name-error-msg');
 			const emailGroup = document.getElementById('email-field-group');
 			const emailError = document.getElementById('email-error-msg');
 			const passwordGroup = document.getElementById('password-field-group');
 			const passwordError = document.getElementById('password-error-msg');
 
-			const emailVal = emailInput?.value.trim() ?? '';
-			const passwordVal = passwordInput?.value ?? '';
+			if (isRegisterMode) {
+				if (!nameVal) {
+					nameGroup?.classList.add('has-error');
+					if (nameError) nameError.textContent = 'Full name is required.';
+					isValid = false;
+				}
+			}
 
 			// Validate Email
 			if (!emailVal) {
 				emailGroup?.classList.add('has-error');
-				if (emailError) emailError.textContent = 'Please enter your registered email address.';
+				if (emailError) emailError.textContent = 'Please enter your email address.';
 				isValid = false;
 			} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
 				emailGroup?.classList.add('has-error');
-				if (emailError) emailError.textContent = 'Please enter a valid email format (e.g. client@credx.com).';
+				if (emailError) emailError.textContent = 'Please enter a valid email format.';
 				isValid = false;
 			}
 
 			// Validate Password
 			if (!passwordVal) {
 				passwordGroup?.classList.add('has-error');
-				if (passwordError) passwordError.textContent = 'Please enter your account password.';
+				if (passwordError) passwordError.textContent = 'Password is required.';
 				isValid = false;
-			} else if (passwordVal.length < 6) {
+			} else if (isRegisterMode && passwordVal.length < 12) {
 				passwordGroup?.classList.add('has-error');
-				if (passwordError) passwordError.textContent = 'Password must contain at least 6 characters.';
+				if (passwordError) passwordError.textContent = 'Backend security requires at least 12 characters.';
 				isValid = false;
 			}
 
 			if (!isValid) return;
 
-			handleSuccessfulAuth(emailVal);
+			// Trigger Loading State
+			if (btnLogin) {
+				btnLogin.classList.add('is-loading');
+				btnLogin.disabled = true;
+			}
+
+			try {
+				if (isRegisterMode) {
+					showAlert('Registering account with CredX...', false);
+					await api.register(emailVal, nameVal, passwordVal);
+					showAlert('Account created! Authenticating session...', false);
+				}
+
+				// Authenticate with backend API
+				const { user } = await api.login(emailVal, passwordVal);
+
+				showAlert(`Authenticated as ${user.full_name}. Redirecting to dashboard...`, false);
+
+				setTimeout(() => {
+					window.location.href = '/landing';
+				}, 600);
+			} catch (err: any) {
+				showAlert(err.message || 'Authentication request failed. Please check credentials.', true);
+			} finally {
+				if (btnLogin) {
+					btnLogin.classList.remove('is-loading');
+					btnLogin.disabled = false;
+				}
+			}
 		});
 
-		// Quick SSO Handlers for demo convenience
-		ssoGoogle?.addEventListener('click', () => {
-			handleSuccessfulAuth('alexander.vance@gmail.com');
+		// Demo SSO fallback
+		document.getElementById('sso-google')?.addEventListener('click', async () => {
+			if (emailInput && passwordInput) {
+				emailInput.value = 'demo@credx.com';
+				passwordInput.value = 'DemoCredXPass123!';
+				form?.dispatchEvent(new Event('submit', { cancelable: true }));
+			}
 		});
 
-		ssoApple?.addEventListener('click', () => {
-			handleSuccessfulAuth('alexander.vance@icloud.com');
+		document.getElementById('sso-apple')?.addEventListener('click', async () => {
+			if (emailInput && passwordInput) {
+				emailInput.value = 'client@credx.com';
+				passwordInput.value = 'ClientCredXPass123!';
+				form?.dispatchEvent(new Event('submit', { cancelable: true }));
+			}
 		});
 	});
 </script>
