@@ -1,0 +1,23 @@
+# Root build context: allow only backend runtime inputs, never frontend/data.
+**
+!backend/
+!backend/Dockerfile
+!backend/requirements.txt
+!backend/alembic.ini
+!backend/app/
+!backend/app/**
+!backend/migrations/
+!backend/migrations/**
+!core/
+!core/__init__.py
+!core/rules/
+!core/rules/**
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+**/*.db
+**/*.sqlite*
+**/*.pem
+**/*.key
+**/*.log

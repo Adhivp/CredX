@@ -15,3 +15,13 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Deployment artifacts and credentials
+.env
+.env.*
+!.env.example
+**/catalyst-debug.log*
+.catalyst-artifacts/
+*.tar
+*.tar.gz
+.hermes/
