@@ -59,6 +59,13 @@ textarea {
 	color: #0A0A0A;
 }
 
+/* Guard against unconstrained SVG explosion */
+svg {
+	max-width: 100%;
+	display: inline-block;
+	vertical-align: middle;
+}
+
 /* Custom Sleek Scrollbar */
 ::-webkit-scrollbar {
 	width: 7px;
