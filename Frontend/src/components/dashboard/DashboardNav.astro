@@ -70,51 +70,16 @@ const { active = "dashboard" } = Astro.props;
     </ul>
   </div>
 
-  <!-- User Profile & Session Controls -->
+  <!-- System Status Footer -->
   <div class="dash-nav-bottom">
     <div class="nav-divider"></div>
-    <div class="user-officer-card" id="sidebar-user-card">
-      <div class="officer-avatar" id="sidebar-avatar">AV</div>
-      <div class="officer-details">
-        <span class="officer-name" id="sidebar-username">Alexander Vance</span>
-        <span class="officer-role">Risk Surveillance</span>
+    <div class="sidebar-status-card">
+      <div class="sidebar-status-row">
+        <span class="pulse-dot-emerald"></span>
+        <span class="sidebar-status-title">Secured Risk Terminal</span>
       </div>
-      <button type="button" class="btn-sidebar-signout" id="sidebar-signout" title="Sign Out">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/>
-          <line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-      </button>
+      <span class="sidebar-status-sub">CredX Intelligence • v2.4</span>
     </div>
   </div>
 </aside>
 
-<script>
-  import { api } from '../../lib/api';
-
-  document.addEventListener('DOMContentLoaded', () => {
-    // Populate user profile in sidebar if available
-    const user = api.getUser();
-    if (user?.full_name) {
-      const nameEl = document.getElementById('sidebar-username');
-      const avatarEl = document.getElementById('sidebar-avatar');
-      if (nameEl) nameEl.textContent = user.full_name;
-      if (avatarEl) {
-        const initials = user.full_name
-          .split(' ')
-          .filter(Boolean)
-          .map((n: string) => n[0].toUpperCase())
-          .join('')
-          .slice(0, 2) || 'CX';
-        avatarEl.textContent = initials;
-      }
-    }
-
-    // Sign out button
-    document.getElementById('sidebar-signout')?.addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '/';
-    });
-  });
-</script>

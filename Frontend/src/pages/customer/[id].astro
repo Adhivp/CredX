@@ -186,6 +186,23 @@ const { id } = Astro.params;
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
             <span id="copyIdText">Copy ID</span>
           </button>
+          <div class="header-officer-cluster">
+            <div class="header-officer-chip">
+              <div class="officer-avatar" id="header-avatar">AV</div>
+              <div class="officer-details header-officer-details">
+                <span class="officer-name" id="header-username">Alexander Vance</span>
+                <span class="officer-role">Risk Surveillance</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-glass btn-header-logout" id="header-signout" title="Sign Out of CredX" aria-label="Sign Out">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/>
+                <polyline points="16 17 21 12 16 7" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="21" y1="12" x2="9" y2="12" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
       </div>`;
 
@@ -636,6 +653,32 @@ const { id } = Astro.params;
         });
       });
     }
+
+    // Attach Top-Right Logout button
+    const signoutBtn = document.getElementById('header-signout');
+    if (signoutBtn) {
+      signoutBtn.addEventListener('click', () => {
+        signoutBtn.setAttribute('style', 'opacity: 0.6; pointer-events: none;');
+        localStorage.removeItem('credx_tokens');
+        localStorage.removeItem('credx_user');
+        window.location.href = '/';
+      });
+    }
+
+    // Populate user profile in top-right header if cached
+    try {
+      const cached = JSON.parse(localStorage.getItem('credx_user') || '{}');
+      if (cached?.full_name) {
+        const nameEl = document.getElementById('header-username');
+        const avatarEl = document.getElementById('header-avatar');
+        if (nameEl) nameEl.textContent = cached.full_name;
+        if (avatarEl) {
+          const initials = cached.full_name.split(' ').filter(Boolean).map(n => n[0].toUpperCase()).join('').slice(0, 2) || 'CX';
+          avatarEl.textContent = initials;
+        }
+      }
+    } catch(e) {}
+
 
     // Attach AI Explanation synthesis
     const explainBtn = document.getElementById('explainBtn');

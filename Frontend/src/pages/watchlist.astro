@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
 ---
 
 <Layout title="CredX — Watchlist">
@@ -8,7 +9,13 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
     <DashboardNav active="watchlist" />
     <main class="dash-main">
       <div class="dash-header">
-        <h1>Risk <span>Watchlist</span></h1>
+        <div class="header-titles">
+          <h1 class="dash-title">Risk <span class="gold-gradient-text">Watchlist</span></h1>
+          <p class="dash-subtitle">Real-time debtor surveillance and early warning triage records.</p>
+        </div>
+        <div class="dash-actions">
+          <OfficerProfileHeader />
+        </div>
       </div>
 
       <div class="filter-bar">

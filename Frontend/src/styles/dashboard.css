@@ -100,7 +100,120 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  flex-wrap: wrap;
 }
+
+/* ── Top-Right Officer Profile & Logout Cluster ───────────────────────── */
+.header-officer-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-officer-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.85rem 0.35rem 0.45rem;
+  backdrop-filter: blur(16px);
+  transition: all 0.2s ease;
+}
+
+.header-officer-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(245, 197, 24, 0.3);
+}
+
+.header-officer-chip .officer-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.72rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(245, 197, 24, 0.25), rgba(245, 197, 24, 0.08));
+  border: 1px solid rgba(245, 197, 24, 0.45);
+  color: var(--gold-400);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.header-officer-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-officer-details .officer-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1.2;
+}
+
+.header-officer-details .officer-role {
+  font-size: 0.65rem;
+  color: var(--gold-400);
+  letter-spacing: 0.02em;
+}
+
+.btn-header-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  color: var(--white-75);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-header-logout:hover {
+  color: #EF4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+/* Sidebar status footer when logout is in the header */
+.sidebar-status-card {
+  padding: 0.85rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sidebar-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.sidebar-status-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--white-80);
+}
+
+.sidebar-status-sub {
+  font-size: 0.65rem;
+  color: var(--white-40);
+  font-family: var(--font-mono);
+}
+
 
 /* ── 3. Buttons ────────────────────────────────────────────────────────── */
 .btn {
