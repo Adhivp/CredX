@@ -1,0 +1,11 @@
+{
+  "appsail": [
+    {
+      "source": "docker-archive://.catalyst-artifacts/credx-api.tar",
+      "name": "credx-api",
+      "port": {
+        "http": 9000
+      }
+    }
+  ]
+}

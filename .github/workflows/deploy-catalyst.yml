@@ -1,0 +1,151 @@
+name: CredX backend - Catalyst Development
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'core/rules/**'
+      - 'core/__init__.py'
+      - '.dockerignore'
+      - 'catalyst.json'
+      - '.catalystrc'
+      - '.github/workflows/deploy-catalyst.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'core/rules/**'
+      - 'core/__init__.py'
+      - '.dockerignore'
+      - 'catalyst.json'
+      - '.catalystrc'
+      - '.github/workflows/deploy-catalyst.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Do not interrupt an upload/configuration/migration halfway through.
+concurrency:
+  group: catalyst-development-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and exercise Python 3.14 container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.22.1'
+      - name: Deployment contract tests
+        run: |
+          python3 backend/tests/test_deployment.py
+          node --test backend/scripts/catalyst.test.cjs
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build SHA-tagged AMD64 image as Docker archive
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64
+          tags: credx-api:${{ github.sha }}
+          push: false
+          provenance: false
+          outputs: type=docker,dest=${{ runner.temp }}/credx-api.tar
+      - name: Exercise migrations, HTTP endpoints, and graceful shutdown
+        env:
+          IMAGE_TAG: credx-api:${{ github.sha }}
+        run: |
+          docker load --input "$RUNNER_TEMP/credx-api.tar"
+          python3 backend/scripts/smoke_container.py "$IMAGE_TAG"
+      - name: Preserve tested image for deployment (no registry)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: credx-api-${{ github.sha }}
+          path: ${{ runner.temp }}/credx-api.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy credx-api to existing Development project
+    needs: build
+    if: github.repository == 'Adhivp/CredX' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CATALYST_PROJECT_ID: ${{ vars.CATALYST_PROJECT_ID }}
+      CATALYST_ORG_ID: ${{ vars.CATALYST_ORG_ID }}
+      CATALYST_ENVIRONMENT: ${{ vars.CATALYST_ENVIRONMENT }}
+      CATALYST_DC: ${{ vars.CATALYST_DC }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.22.1'
+      - name: Validate fixed Development target and required secrets
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          node - <<'NODE'
+          const { validateTarget, desiredVariables } = require('./backend/scripts/catalyst.cjs');
+          validateTarget(process.env);
+          desiredVariables(process.env, {});
+          if (!process.env.CATALYST_TOKEN) throw new Error('CATALYST_TOKEN repository secret is missing');
+          NODE
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: credx-api-${{ github.sha }}
+          path: .catalyst-artifacts
+      - name: Install inspected official Catalyst CLI
+        run: |
+          npm install --global zcatalyst-cli@1.29.1
+          printf 'NODE_PATH=%s\n' "$(npm root --global)" >> "$GITHUB_ENV"
+          catalyst --version
+      - name: Associate existing project and check service identity
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+        run: |
+          catalyst project:use "$CATALYST_PROJECT_ID" \
+            --org "$CATALYST_ORG_ID" --dc "$CATALYST_DC" --non-interactive
+          node backend/scripts/catalyst.cjs inspect
+      - name: Create or update credx-api using CLI name-based upsert
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+        run: |
+          # Standalone Docker deploy is an upsert by name, NOT a separate create.
+          # It avoids the regular custom target's forced Catalyst auth setting.
+          catalyst deploy appsail --name credx-api \
+            --source docker-archive://.catalyst-artifacts/credx-api.tar --port 9000 \
+            --project "$CATALYST_PROJECT_ID" --org "$CATALYST_ORG_ID" \
+            --dc "$CATALYST_DC" --non-interactive | tee "$RUNNER_TEMP/catalyst-deploy.log"
+          # CLI 1.29.1 can return zero when individual targets fail.
+          grep -Fq 'DEPLOYMENT SUCCESSFUL' "$RUNNER_TEMP/catalyst-deploy.log"
+      - name: Wait for image creation and configure AppSail environment
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: node backend/scripts/catalyst.cjs configure
+      - name: Verify actual service URL and HTTP endpoints
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+        run: node backend/scripts/catalyst.cjs verify
+      - name: Remove local deployment artifacts and CLI debug logs
+        if: always()
+        run: |
+          rm -f .catalyst-artifacts/credx-api.tar catalyst-debug.log
+          rm -f "$RUNNER_TEMP/catalyst-deploy.log"
