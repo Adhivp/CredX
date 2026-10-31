@@ -1,0 +1,753 @@
+/* ==========================================================================
+   CredX Authenticated Banking Landing Portal Styles (`/landing`)
+   ========================================================================== */
+
+.landing-page {
+	min-height: 100vh;
+	background-color: var(--bg-canvas);
+	color: var(--text-primary);
+	position: relative;
+	overflow-x: hidden;
+}
+
+/* 1. Luxury Sticky Navbar */
+.landing-nav {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+	background: rgba(10, 10, 10, 0.82);
+	backdrop-filter: blur(20px);
+	border-bottom: 1px solid var(--border-medium);
+	padding: 0.9rem 2.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	transition: all var(--ease-base);
+}
+
+.nav-brand-group {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.nav-brand-title {
+	font-family: var(--font-display);
+	font-size: 1.6rem;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	color: var(--white);
+}
+
+.nav-live-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.25rem 0.65rem;
+	background: rgba(34, 197, 94, 0.1);
+	border: 1px solid rgba(34, 197, 94, 0.25);
+	border-radius: var(--radius-full);
+	font-size: 0.725rem;
+	font-weight: 600;
+	color: var(--status-success);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.nav-live-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--status-success);
+	box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+	animation: pulseDot 2s infinite;
+}
+
+.nav-menu-links {
+	display: flex;
+	align-items: center;
+	gap: 1.75rem;
+}
+
+.nav-link {
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: var(--white-75);
+	position: relative;
+	padding: 0.35rem 0;
+	transition: color var(--ease-fast);
+}
+
+.nav-link:hover,
+.nav-link.active {
+	color: var(--gold-500);
+}
+
+.nav-link.active::after {
+	content: '';
+	position: absolute;
+	bottom: -2px;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background: var(--gold-500);
+	border-radius: var(--radius-full);
+}
+
+.nav-client-actions {
+	display: flex;
+	align-items: center;
+	gap: 1.25rem;
+}
+
+.client-profile-chip {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.35rem 0.85rem 0.35rem 0.45rem;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-full);
+}
+
+.client-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--gold-gradient);
+	color: #0A0A0A;
+	font-weight: 800;
+	font-size: 0.8rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.client-info {
+	display: flex;
+	flex-direction: column;
+	text-align: left;
+}
+
+.client-name {
+	font-size: 0.825rem;
+	font-weight: 600;
+	color: var(--white);
+	line-height: 1.2;
+}
+
+.client-tier {
+	font-size: 0.7rem;
+	color: var(--gold-500);
+	letter-spacing: 0.02em;
+}
+
+.btn-signout {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.5rem 1rem;
+	background: rgba(239, 68, 68, 0.08);
+	border: 1px solid rgba(239, 68, 68, 0.25);
+	border-radius: var(--radius-md);
+	color: #F87171;
+	font-size: 0.825rem;
+	font-weight: 600;
+	transition: all var(--ease-fast);
+}
+
+.btn-signout:hover {
+	background: rgba(239, 68, 68, 0.16);
+	border-color: rgba(239, 68, 68, 0.4);
+	color: #FCA5A5;
+	transform: translateY(-1px);
+}
+
+/* 2. Main Portal Content */
+.landing-main {
+	max-width: 1360px;
+	margin: 0 auto;
+	padding: 2.75rem 2rem 5rem 2rem;
+	display: flex;
+	flex-direction: column;
+	gap: 2.75rem;
+	position: relative;
+	z-index: 1;
+}
+
+/* 3. Hero & Balance Grid */
+.hero-grid {
+	display: grid;
+	grid-template-columns: 1.4fr 1fr;
+	gap: 2rem;
+	align-items: stretch;
+}
+
+.balance-card {
+	background: var(--black-900);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-2xl);
+	padding: 2.5rem;
+	position: relative;
+	overflow: hidden;
+	box-shadow: var(--shadow-card);
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.balance-card::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 1px;
+	background: var(--gold-border-gradient);
+}
+
+.balance-header-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	margin-bottom: 1.5rem;
+}
+
+.balance-greeting {
+	font-size: 0.95rem;
+	color: var(--white-40);
+	margin-bottom: 0.25rem;
+}
+
+.client-greeting-title {
+	font-family: var(--font-display);
+	font-size: 1.85rem;
+	font-weight: 700;
+	color: var(--white);
+}
+
+.account-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.35rem 0.85rem;
+	background: rgba(245, 197, 24, 0.08);
+	border: 1px solid rgba(245, 197, 24, 0.25);
+	border-radius: var(--radius-full);
+	font-size: 0.775rem;
+	font-weight: 600;
+	color: var(--gold-500);
+	font-family: var(--font-mono);
+}
+
+.balance-figure-group {
+	margin: 1.5rem 0 2rem 0;
+}
+
+.balance-label {
+	font-size: 0.85rem;
+	color: var(--white-40);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	display: block;
+	margin-bottom: 0.5rem;
+}
+
+.balance-number {
+	font-family: var(--font-display);
+	font-size: 3.25rem;
+	font-weight: 800;
+	color: var(--white);
+	letter-spacing: -0.03em;
+	line-height: 1;
+}
+
+.balance-meta-row {
+	display: flex;
+	align-items: center;
+	gap: 1.5rem;
+	margin-top: 0.85rem;
+}
+
+.yield-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.825rem;
+	font-weight: 700;
+	color: var(--status-success);
+	background: rgba(34, 197, 94, 0.1);
+	padding: 0.25rem 0.65rem;
+	border-radius: var(--radius-full);
+}
+
+.meta-caption {
+	font-size: 0.825rem;
+	color: var(--white-40);
+}
+
+.balance-stats-bar {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1.25rem;
+	padding-top: 1.75rem;
+	border-top: 1px solid var(--border-medium);
+}
+
+.substat-item {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.substat-label {
+	font-size: 0.75rem;
+	color: var(--white-40);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.substat-val {
+	font-family: var(--font-display);
+	font-size: 1.2rem;
+	font-weight: 700;
+	color: var(--white);
+}
+
+.substat-val.gold {
+	color: var(--gold-500);
+}
+
+/* 4. Luxury Metal Card Showcase */
+.metal-card-container {
+	background: var(--black-900);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-2xl);
+	padding: 2.25rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	box-shadow: var(--shadow-card);
+	position: relative;
+}
+
+.metal-card {
+	width: 100%;
+	aspect-ratio: 1.586 / 1;
+	border-radius: var(--radius-xl);
+	background: radial-gradient(circle at 10% 20%, #2A2A2A 0%, #151515 50%, #050505 100%);
+	border: 1.5px solid rgba(245, 197, 24, 0.45);
+	padding: 1.6rem 1.75rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	position: relative;
+	overflow: hidden;
+	box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 28px rgba(245, 197, 24, 0.15);
+	transition: transform var(--ease-base);
+}
+
+.metal-card:hover {
+	transform: translateY(-4px) rotateX(2deg);
+}
+
+.metal-card::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, transparent 40%, rgba(245, 197, 24, 0.08) 100%);
+	pointer-events: none;
+}
+
+.card-top-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.card-chip {
+	width: 44px;
+	height: 32px;
+	border-radius: 6px;
+	background: linear-gradient(135deg, #FFE699 0%, #F5C518 50%, #8C700A 100%);
+	box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+	position: relative;
+	border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.card-contactless svg {
+	width: 22px;
+	height: 22px;
+	color: var(--white-60);
+}
+
+.card-logo-emblem {
+	width: 36px;
+	height: 36px;
+}
+
+.card-logo-emblem img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.card-number {
+	font-family: var(--font-mono);
+	font-size: 1.25rem;
+	letter-spacing: 0.18em;
+	color: #FFFFFF;
+	text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+	margin: 1rem 0;
+}
+
+.card-bottom-row {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+}
+
+.card-holder-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.card-holder-label {
+	font-size: 0.65rem;
+	color: var(--white-40);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.card-holder-name {
+	font-family: var(--font-display);
+	font-size: 0.95rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	color: var(--white);
+	text-transform: uppercase;
+}
+
+.card-expiry-info {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.15rem;
+}
+
+.card-tier-tag {
+	font-size: 0.725rem;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+	color: var(--gold-500);
+	text-transform: uppercase;
+}
+
+.card-actions-row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 1.25rem;
+}
+
+.btn-card-action {
+	flex: 1;
+	padding: 0.65rem 1rem;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-md);
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--white-75);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	transition: all var(--ease-fast);
+}
+
+.btn-card-action:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--white);
+	border-color: var(--gold-500);
+}
+
+/* 5. Quick Action Shortcuts */
+.quick-actions-bar {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 1.25rem;
+}
+
+.action-tile {
+	background: var(--black-900);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-xl);
+	padding: 1.4rem 1.25rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: 0.85rem;
+	transition: all var(--ease-base);
+}
+
+.action-tile:hover {
+	background: rgba(255, 255, 255, 0.03);
+	border-color: rgba(245, 197, 24, 0.4);
+	transform: translateY(-3px);
+	box-shadow: var(--shadow-gold);
+}
+
+.action-icon-box {
+	width: 48px;
+	height: 48px;
+	border-radius: var(--radius-lg);
+	background: linear-gradient(135deg, rgba(245, 197, 24, 0.15), rgba(245, 197, 24, 0.03));
+	border: 1px solid rgba(245, 197, 24, 0.25);
+	color: var(--gold-500);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.action-icon-box svg {
+	width: 22px;
+	height: 22px;
+}
+
+.action-title {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--white);
+}
+
+.action-caption {
+	font-size: 0.75rem;
+	color: var(--white-40);
+}
+
+/* 6. Ledger Section */
+.ledger-section {
+	background: var(--black-900);
+	border: 1px solid var(--border-medium);
+	border-radius: var(--radius-2xl);
+	padding: 2.25rem;
+	box-shadow: var(--shadow-card);
+}
+
+.ledger-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1.75rem;
+}
+
+.ledger-title-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.ledger-title {
+	font-family: var(--font-display);
+	font-size: 1.45rem;
+	font-weight: 700;
+	color: var(--white);
+}
+
+.ledger-caption {
+	font-size: 0.825rem;
+	color: var(--white-40);
+}
+
+.ledger-filter-group {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.filter-chip {
+	padding: 0.4rem 0.85rem;
+	border-radius: var(--radius-full);
+	font-size: 0.775rem;
+	font-weight: 600;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--border-medium);
+	color: var(--white-60);
+	transition: all var(--ease-fast);
+}
+
+.filter-chip.active,
+.filter-chip:hover {
+	background: var(--gold-500);
+	color: #0A0A0A;
+	border-color: var(--gold-500);
+}
+
+.ledger-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.ledger-table th {
+	text-align: left;
+	padding: 0.85rem 1rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--white-40);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	border-bottom: 1px solid var(--border-medium);
+}
+
+.ledger-table td {
+	padding: 1.15rem 1rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+	font-size: 0.875rem;
+}
+
+.ledger-table tr:hover td {
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.tx-entity-cell {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+}
+
+.tx-icon-circle {
+	width: 38px;
+	height: 38px;
+	border-radius: var(--radius-md);
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--border-medium);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--white-75);
+}
+
+.tx-icon-circle.credit {
+	color: var(--status-success);
+	background: rgba(34, 197, 94, 0.08);
+	border-color: rgba(34, 197, 94, 0.2);
+}
+
+.tx-entity-name {
+	font-weight: 600;
+	color: var(--white);
+	display: block;
+}
+
+.tx-category-tag {
+	font-size: 0.75rem;
+	color: var(--white-40);
+}
+
+.tx-amount {
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: 0.95rem;
+	text-align: right;
+}
+
+.tx-amount.positive {
+	color: var(--status-success);
+}
+
+.tx-status-badge {
+	display: inline-flex;
+	padding: 0.25rem 0.65rem;
+	border-radius: var(--radius-full);
+	font-size: 0.725rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.tx-status-badge.completed {
+	background: rgba(34, 197, 94, 0.1);
+	color: var(--status-success);
+}
+
+.tx-status-badge.pending {
+	background: rgba(245, 197, 24, 0.1);
+	color: var(--gold-500);
+}
+
+/* 7. Institutional Footer */
+.landing-footer {
+	border-top: 1px solid var(--border-medium);
+	padding: 3rem 2.5rem 4rem 2.5rem;
+	background: var(--black-950);
+	color: var(--white-40);
+	font-size: 0.8rem;
+}
+
+.footer-inner {
+	max-width: 1360px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.footer-top-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.footer-disclaimer {
+	line-height: 1.6;
+	color: var(--white-40);
+}
+
+.footer-nav-row {
+	display: flex;
+	gap: 1.5rem;
+}
+
+.footer-nav-row a:hover {
+	color: var(--gold-500);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1080px) {
+	.hero-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.quick-actions-bar {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+@media (max-width: 768px) {
+	.landing-nav {
+		padding: 0.85rem 1.25rem;
+	}
+
+	.nav-menu-links {
+		display: none;
+	}
+
+	.quick-actions-bar {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.balance-number {
+		font-size: 2.4rem;
+	}
+
+	.balance-stats-bar {
+		grid-template-columns: 1fr;
+	}
+
+	.ledger-table th:nth-child(2),
+	.ledger-table td:nth-child(2) {
+		display: none;
+	}
+}

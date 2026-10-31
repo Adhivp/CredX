@@ -1,0 +1,29 @@
+{
+  "defaults": {
+    "project": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "54564000000101001",
+      "name": "credx",
+      "domain": {
+        "id": "50047322471",
+        "name": "credx-60077360744.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60077360744",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}
