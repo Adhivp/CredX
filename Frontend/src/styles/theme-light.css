@@ -46,11 +46,15 @@
   --white-05: rgba(15, 23, 42, 0.05);
   --white-03: rgba(15, 23, 42, 0.03);
 
-  /* Gold stays as a small accent but darkened for contrast on white */
-  --gold-300: #D97706;
-  --gold-400: #B45309;
-  --gold-500: #B45309;
-  --gold-600: #92400E;
+  /* Black and white: every gold accent becomes ink */
+  --gold-50: #F8FAFC;
+  --gold-100: #F1F5F9;
+  --gold-200: #E2E8F0;
+  --gold-300: #334155;
+  --gold-400: #1E293B;
+  --gold-500: #0F172A;
+  --gold-600: #0F172A;
+  --gold-700: #020617;
 
   /* Gold accents become ink */
   --gold-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
@@ -226,3 +230,149 @@ body:has(.dash-layout) { background: #F8F9FA; }
 .dash-layout .spectrum-eyebrow { color: var(--slate-500); }
 .dash-layout .info-tip-body,
 .dash-layout [role="tooltip"] { background: #FFFFFF; color: var(--slate-600); border-color: var(--slate-200); }
+
+
+/* ==========================================================================
+   Black & white accents
+   ========================================================================== */
+.dash-layout .brand-logo-frame { background: #FFFFFF; border: 1px solid var(--slate-200); box-shadow: none; }
+.dash-layout .cx-tone-accent { --cx-tone-bg: rgba(15, 23, 42, .06); --cx-tone-fg: #0F172A; --cx-tone-border: rgba(15, 23, 42, .25); }
+.dash-layout .cx-tab.active { border-bottom-color: #0F172A; }
+.dash-layout .pulse-dot { background: #16A34A; box-shadow: none; }
+
+/* ==========================================================================
+   Sidebar: always fits the screen, scrolls on its own when it has to
+   ========================================================================== */
+.dash-layout .dash-nav {
+  height: 100vh; height: 100dvh;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 1.25rem 0.9rem;
+  justify-content: flex-start;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}
+.dash-layout .dash-nav::-webkit-scrollbar { width: 6px; }
+.dash-layout .dash-nav::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 3px; }
+.dash-layout .dash-nav-brand { margin-bottom: 0.75rem; }
+.dash-layout .engine-status-pill { margin-bottom: 0.5rem; }
+.dash-layout .nav-section-title { font-size: 0.62rem; margin: 0.85rem 0 0.3rem 0.55rem; }
+.dash-layout .dash-nav-links { gap: 0.1rem; margin: 0; }
+.dash-layout .nav-item { padding: 0.5rem 0.7rem; font-size: 0.86rem; gap: 0.65rem; }
+.dash-layout .nav-menu-toggle { display: none; }
+.dash-layout .dash-main { min-width: 0; }
+
+/* ==========================================================================
+   Long lists: bounded height with their own scroll and a sticky header row,
+   so a page never turns into one endless scroll
+   ========================================================================== */
+.dash-layout .table-scroll-frame,
+.dash-layout .table-wrap,
+.dash-layout .cx-table-wrap,
+.dash-layout .repayment-table-frame {
+  max-height: min(68vh, 640px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}
+.dash-layout .split-list,
+.dash-layout .timeline,
+.dash-layout .cx-timeline {
+  max-height: 420px; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}
+.dash-layout .table-scroll-frame thead th,
+.dash-layout .table-wrap thead th,
+.dash-layout .cx-table-wrap thead th,
+.dash-layout .repayment-table-frame thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--slate-50);
+}
+.dash-layout .cx-pre { max-height: 22rem; }
+
+/* ==========================================================================
+   Phones and small tablets: sidebar becomes a sticky top bar with a menu
+   ========================================================================== */
+@media (max-width: 860px) {
+  .dash-layout .dash-nav {
+    position: sticky; top: 0; z-index: 50;
+    width: 100%; height: auto; min-height: 0; max-height: 100dvh;
+    padding: 0.6rem 1rem;
+    border-right: 0; border-bottom: 1px solid var(--slate-200);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+  }
+  .dash-layout .dash-nav-top { display: flex; flex-direction: column; }
+  .dash-layout .dash-nav-brand { margin: 0; padding-right: 3rem; }
+  .dash-layout .nav-menu-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    position: absolute; top: 0.65rem; right: 0.9rem;
+    width: 2.5rem; height: 2.5rem; border-radius: 8px;
+    background: #FFFFFF; color: var(--ink-900); border: 1px solid var(--slate-300); cursor: pointer;
+  }
+  .dash-layout .dash-nav:not(.open) .engine-status-pill,
+  .dash-layout .dash-nav:not(.open) .nav-section-title,
+  .dash-layout .dash-nav:not(.open) .dash-nav-links { display: none; }
+  .dash-layout .dash-nav.open { overflow-y: auto; }
+  .dash-layout .dash-nav.open .dash-nav-links { flex-direction: column; flex-wrap: nowrap; }
+  .dash-layout .dash-nav.open .engine-status-pill { margin-top: 0.75rem; }
+  .dash-layout .dash-main { padding: 1.25rem 1rem; }
+  .dash-layout .dash-header { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
+  .dash-layout .dash-actions { flex-wrap: wrap; }
+  .dash-layout .dash-title { font-size: 1.5rem; }
+  .dash-layout .table-scroll-frame,
+  .dash-layout .table-wrap,
+  .dash-layout .cx-table-wrap,
+  .dash-layout .repayment-table-frame { max-height: 60vh; }
+}
+
+/* ==========================================================================
+   Sign-in page in black and white
+   ========================================================================== */
+.auth-container {
+  --text-primary: #0F172A; --text-secondary: #475569; --text-muted: #64748B; --text-accent: #0F172A;
+  --bg-input: #FFFFFF; --bg-input-active: #FFFFFF;
+  --border-subtle: #F1F5F9; --border-medium: #E2E8F0; --border-strong: #CBD5E1; --border-accent: #0F172A;
+  --white: #0F172A; --white-90: rgba(15,23,42,.9); --white-75: rgba(15,23,42,.72); --white-60: rgba(15,23,42,.58);
+  --white-40: rgba(15,23,42,.42); --white-20: rgba(15,23,42,.14); --white-10: rgba(15,23,42,.08);
+  --white-05: rgba(15,23,42,.05); --white-03: rgba(15,23,42,.03);
+  --gold-500: #0F172A; --gold-400: #1E293B; --gold-300: #334155; --gold-600: #0F172A;
+  --gold-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  --gold-gradient-hover: linear-gradient(135deg, #334155 0%, #1E293B 100%);
+  background: #F8F9FA !important; color: #0F172A;
+}
+body:has(.auth-container) { background: #F8F9FA; }
+.auth-container .mesh-orb,
+.auth-container .noise-overlay,
+.auth-container .grid-overlay { display: none; }
+.auth-container .auth-card {
+  background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.auth-container .text-input { background: #FFFFFF; border: 1px solid #CBD5E1; color: #0F172A; }
+.auth-container .text-input:focus { border-color: #0F172A; box-shadow: 0 0 0 3px rgba(15, 23, 42, .08); }
+.auth-container .primary-btn { background: #0F172A; color: #FFFFFF; border: 1px solid #0F172A; box-shadow: 0 2px 4px rgba(15,23,42,.08); }
+.auth-container .primary-btn:hover { background: #1E293B; }
+.auth-container .primary-btn * { color: #FFFFFF; }
+.auth-container .feature-card,
+.auth-container .sso-btn { background: #FFFFFF; border: 1px solid #E2E8F0; }
+.auth-container .feature-icon { background: #F1F5F9; color: #0F172A; border-color: #E2E8F0; }
+.auth-container .headline-gradient,
+.auth-container .gold-accent,
+.auth-container .brand-title {
+  background: none; -webkit-background-clip: initial; background-clip: initial;
+  -webkit-text-fill-color: currentColor; color: #0F172A;
+}
+.auth-container .link-gold,
+.auth-container .link-forgot,
+.auth-container .header-tag { color: #0F172A; }
+.auth-container .link-gold { text-decoration: underline; text-underline-offset: 2px; }
+.auth-container .checkbox-visual { border-color: #CBD5E1; }
+
+/* Leftover gold glows on the sign-in page */
+.auth-container .brand-emblem,
+.auth-container .brand-logo-img { box-shadow: none; filter: none; background: transparent; }
+.auth-container .auth-card::before,
+.auth-container .auth-card::after { background: none; box-shadow: none; }
+
+/* Customer dossier: long signal list scrolls inside its panel */
+.dash-layout .warning-cards-list {
+  max-height: 560px; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--slate-300) transparent;
+}

@@ -17,6 +17,9 @@ const { active = "dashboard" } = Astro.props;
         <span class="brand-subtext">Risk Intelligence</span>
       </div>
     </a>
+    <button type="button" class="nav-menu-toggle" id="nav-menu-toggle" aria-controls="dash-sidebar" aria-expanded="false" aria-label="Open menu">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
 
     <!-- Engine Status Pill -->
     <div class="engine-status-pill">
@@ -156,3 +159,15 @@ const { active = "dashboard" } = Astro.props;
 
 </aside>
 
+<script>
+  // Phone layout: the sidebar collapses to a top bar; this button opens the menu.
+  const sidebar = document.getElementById('dash-sidebar');
+  const toggle = document.getElementById('nav-menu-toggle');
+  toggle?.addEventListener('click', () => {
+    const open = sidebar?.classList.toggle('open') ?? false;
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  });
+  // Keep the active item in view when the sidebar scrolls.
+  sidebar?.querySelector('.nav-item.active')?.scrollIntoView({ block: 'nearest' });
+</script>
