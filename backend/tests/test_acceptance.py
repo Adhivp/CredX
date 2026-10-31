@@ -41,8 +41,11 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
     manager_id, manager = actors["manager"]
 
     # 1-8. Analyst initiates; the agents investigate and pause on a material question.
-    r = client.post("/api/v1/investigations", headers=analyst,
-                    json={"customer_id": CUSTOMER, "question": "Assess recent deterioration"})
+    r = client.post(
+        "/api/v1/investigations",
+        headers=analyst,
+        json={"customer_id": CUSTOMER, "question": "Assess recent deterioration"},
+    )
     assert r.status_code == 201, r.text
     ws = r.json()
     iid = ws["id"]
@@ -55,8 +58,10 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
     assert set(first_wave["agents"]) == {"repayment_specialist", "cashflow_specialist"}
 
     delegated = [e["payload"] for e in events(ws, "delegation_authorised")]
-    assert any(d["agent"] == "exposure_specialist"
-               and d["requested_by"] == "agent:repayment_specialist" for d in delegated)
+    assert any(
+        d["agent"] == "exposure_specialist" and d["requested_by"] == "agent:repayment_specialist"
+        for d in delegated
+    )
     rejected = [e["payload"] for e in events(ws, "delegation_rejected")]
     assert any(r["decision"].startswith("duplicate_of:") for r in rejected)
     exposure_task = next(t for t in ws["tasks"] if t["agent"] == "exposure_specialist")
@@ -78,21 +83,33 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
             for e in f["evidence"]:
                 if e["source_table"] == "portfolio_aggregates":
                     continue
-                row = db.execute(text(f"select id from {e['source_table']} where id = :id"),
-                                 {"id": e["record_id"]}).first()
+                row = db.execute(
+                    text(f"select id from {e['source_table']} where id = :id"),
+                    {"id": e["record_id"]},
+                ).first()
                 assert row is not None
 
     # 9. Analyst adds customer context and requests one more investigation.
-    r = client.post(f"/api/v1/investigations/{iid}/notes", headers=analyst, json={
-        "kind": "context", "category": "temporary_disruption",
-        "content": "RM reports the customer lost a major client in June and signed a "
-                   "replacement contract in August.",
-    })
+    r = client.post(
+        f"/api/v1/investigations/{iid}/notes",
+        headers=analyst,
+        json={
+            "kind": "context",
+            "category": "temporary_disruption",
+            "content": "RM reports the customer lost a major client in June and signed a "
+            "replacement contract in August.",
+        },
+    )
     assert r.status_code == 200, r.text
-    r = client.post(f"/api/v1/investigations/{iid}/tasks", headers=analyst, json={
-        "specialist": "cashflow_specialist", "hypothesis_code": "human_reported_context",
-        "question": "Do the latest inflows reflect the replacement contract?",
-    })
+    r = client.post(
+        f"/api/v1/investigations/{iid}/tasks",
+        headers=analyst,
+        json={
+            "specialist": "cashflow_specialist",
+            "hypothesis_code": "human_reported_context",
+            "question": "Do the latest inflows reflect the replacement contract?",
+        },
+    )
     assert r.status_code == 200, r.text
     ws = r.json()
 
@@ -106,7 +123,8 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
     adjudication = ws["adjudications"][-1]
     assert adjudication["pathway"] == "C"
     assert adjudication["classification"] in {
-        "sustained_deterioration", "accelerating_deterioration"
+        "sustained_deterioration",
+        "accelerating_deterioration",
     }
     assert any("unresolved" in r for r in adjudication["escalation_reasons"])
 
@@ -126,34 +144,55 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
     _, officer = actors["officer"]
     _, junior = actors["junior_manager"]
     body = {"action": "accept_classification", "reason": "Agree with evidence"}
-    assert client.post(f"/api/v1/investigations/{iid}/classification-decision",
-                       headers=officer, json=body).status_code == 403
-    assert client.post(f"/api/v1/investigations/{iid}/classification-decision",
-                       headers=analyst, json=body).status_code == 403
-    r = client.post(f"/api/v1/investigations/{iid}/classification-decision",
-                    headers=junior, json=body)
+    assert (
+        client.post(
+            f"/api/v1/investigations/{iid}/classification-decision", headers=officer, json=body
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/investigations/{iid}/classification-decision", headers=analyst, json=body
+        ).status_code
+        == 403
+    )
+    r = client.post(
+        f"/api/v1/investigations/{iid}/classification-decision", headers=junior, json=body
+    )
     assert r.status_code == 403 and "authority" in r.json()["detail"]
 
     # 12. Authorised Credit Manager overrides with a recorded reason and decides actions.
-    r = client.post(f"/api/v1/investigations/{iid}/classification-decision", headers=manager,
-                    json={"action": "override_classification", "reason": "x"})
+    r = client.post(
+        f"/api/v1/investigations/{iid}/classification-decision",
+        headers=manager,
+        json={"action": "override_classification", "reason": "x"},
+    )
     assert r.status_code == 422  # reason too short / no new classification
-    r = client.post(f"/api/v1/investigations/{iid}/classification-decision", headers=manager,
-                    json={"action": "override_classification",
-                          "classification": "emerging_deterioration", "severity": "high",
-                          "reason": "Replacement contract verified; treat as emerging, not "
-                                    "sustained, pending two more months of data."})
+    r = client.post(
+        f"/api/v1/investigations/{iid}/classification-decision",
+        headers=manager,
+        json={
+            "action": "override_classification",
+            "classification": "emerging_deterioration",
+            "severity": "high",
+            "reason": "Replacement contract verified; treat as emerging, not "
+            "sustained, pending two more months of data.",
+        },
+    )
     assert r.status_code == 200, r.text
     ws = r.json()
     assert ws["status"] == "awaiting_approval"  # interventions still undecided
-    pending = [i for i in ws["adjudications"][-1]["proposed_interventions"]
-               if i["requires_approval"]]
+    pending = [
+        i for i in ws["adjudications"][-1]["proposed_interventions"] if i["requires_approval"]
+    ]
     assert pending
     for i, intervention in enumerate(pending):
         action = "approve_intervention" if i == 0 else "reject_intervention"
-        r = client.post(f"/api/v1/investigations/{iid}/interventions/{intervention['id']}/decision",
-                        headers=manager, json={"action": action,
-                                               "reason": "Decision under delegated authority"})
+        r = client.post(
+            f"/api/v1/investigations/{iid}/interventions/{intervention['id']}/decision",
+            headers=manager,
+            json={"action": action, "reason": "Decision under delegated authority"},
+        )
         assert r.status_code == 200, r.text
     ws = r.json()
 
@@ -164,16 +203,21 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
     assert effective["classification"] == "emerging_deterioration"
     assert ws["adjudications"][-1]["classification"] == adjudication["classification"]
     approval = next(d for d in ws["decisions"] if d["action"] == "approve_intervention")
-    assert approval["new_state"] == {"code": pending[0]["code"],
-                                     "status": "approved_pending_downstream", "executed": False}
+    assert approval["new_state"] == {
+        "code": pending[0]["code"],
+        "status": "approved_pending_downstream",
+        "executed": False,
+    }
     override = next(d for d in ws["decisions"] if d["action"] == "override_classification")
     assert override["user"]["id"] == manager_id and override["role"] == "credit_manager"
     assert override["previous_state"]["classification"] == adjudication["classification"]
     assert override["reason"] and override["policy_version_id"] == ws["policy"]["id"]
     with client.app.state.session_factory() as db:
         with pytest.raises(DatabaseError):
-            db.execute(text("update adjudications set classification='low_risk' where id=:i"),
-                       {"i": adjudication["id"]})
+            db.execute(
+                text("update adjudications set classification='low_risk' where id=:i"),
+                {"i": adjudication["id"]},
+            )
         db.rollback()
         with pytest.raises(DatabaseError):
             db.execute(text("delete from human_decisions"))
@@ -181,8 +225,9 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
         user_ids = set(db.scalars(select(User.id)))
         assert {d.user_id for d in db.scalars(select(HumanDecision))} <= user_ids
     _, auditor = actors["auditor"]
-    logs = client.get("/api/v1/audit/logs", headers=auditor,
-                      params={"resource_id": iid}).json()["items"]
+    logs = client.get("/api/v1/audit/logs", headers=auditor, params={"resource_id": iid}).json()[
+        "items"
+    ]
     assert {"decision:override_classification", "decision:approve_intervention"} <= {
         log["action"] for log in logs
     }
@@ -192,8 +237,12 @@ def test_acceptance_scenario_end_to_end(client, actors, load_scenarios):
         "customer_id,loan_id,due_date,payment_date,amount_due,amount_paid,dpd,repayment_status\n"
         f"{CUSTOMER},{CUSTOMER}-L1,2026-10-01,,35000,0,31,missed\n"
     )
-    r = client.post("/api/v1/ews/upload", headers=analyst, params={"data_type": "repayments"},
-                    files={"file": ("new.csv", csv.encode(), "text/csv")})
+    r = client.post(
+        "/api/v1/ews/upload",
+        headers=analyst,
+        params={"data_type": "repayments"},
+        files={"file": ("new.csv", csv.encode(), "text/csv")},
+    )
     assert r.status_code == 200 and r.json()["records_loaded"] == 1, r.text
     ws = client.get(f"/api/v1/investigations/{iid}", headers=analyst).json()
     monitoring = ws["monitoring_events"][-1]
@@ -210,15 +259,22 @@ def test_preparer_cannot_approve_own_case(client, make_user, load_scenarios):
     load_scenarios("acceptance_customer", prefix="ACC-1")
     seg = (("segment", "sme_finance"),)
     _, manager = make_user("credit_manager", seg, approval_limit=10_000_000, name="m1")
-    ws = client.post("/api/v1/investigations", headers=manager,
-                     json={"customer_id": CUSTOMER}).json()
+    ws = client.post(
+        "/api/v1/investigations", headers=manager, json={"customer_id": CUSTOMER}
+    ).json()
     iid = ws["id"]
-    client.post(f"/api/v1/investigations/{iid}/complete-review", headers=manager,
-                json={"reason": "Proceed to adjudication"})
+    client.post(
+        f"/api/v1/investigations/{iid}/complete-review",
+        headers=manager,
+        json={"reason": "Proceed to adjudication"},
+    )
     ws = client.get(f"/api/v1/investigations/{iid}", headers=manager).json()
     assert ws["status"] == "awaiting_approval"
-    r = client.post(f"/api/v1/investigations/{iid}/classification-decision", headers=manager,
-                    json={"action": "accept_classification", "reason": "Self approval attempt"})
+    r = client.post(
+        f"/api/v1/investigations/{iid}/classification-decision",
+        headers=manager,
+        json={"action": "accept_classification", "reason": "Self approval attempt"},
+    )
     assert r.status_code == 403 and "Four-eyes" in r.json()["detail"]
     decisions = json.loads(json.dumps(ws["decisions"]))
     assert not any(d["action"] == "accept_classification" for d in decisions)

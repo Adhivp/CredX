@@ -17,14 +17,14 @@ def test_migrations_upgrade_match_models_and_downgrade(tmp_path, monkeypatch):
     config = Config("alembic.ini")
     command.upgrade(config, "head")
     engine = create_engine(url)
-    assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {
-        "alembic_version"
-    }
+    assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables) | {"alembic_version"}
     command.check(config)
     with engine.connect() as connection:
         triggers = {
             row[0]
-            for row in connection.execute(text("select name from sqlite_master where type='trigger'"))
+            for row in connection.execute(
+                text("select name from sqlite_master where type='trigger'")
+            )
         }
     for table in APPEND_ONLY_TABLES:
         assert {f"trg_{table}_no_update", f"trg_{table}_no_delete"} <= triggers

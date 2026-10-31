@@ -43,10 +43,17 @@ def make_user(client):
     def factory(role, scopes=(("all", ""),), approval_limit=None, name=None):
         name = name or role
         email = f"{name}@bank.example"
-        assert client.post(
-            "/api/v1/auth/register",
-            json={"email": email, "full_name": name.replace("_", " ").title(), "password": PASSWORD},
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": email,
+                    "full_name": name.replace("_", " ").title(),
+                    "password": PASSWORD,
+                },
+            ).status_code
+            == 201
+        )
         with client.app.state.session_factory() as db:
             user = db.query(User).filter_by(email=email).one()
             user.role = role
@@ -66,9 +73,8 @@ def make_user(client):
 @pytest.fixture
 def load_scenarios(client):
     """Load benchmark scenarios (by key) into the test database."""
-    from evaluation.scenarios import ACCEPTANCE, SCENARIOS, build_records
-
     from app.services.ingestion import load_dataset
+    from evaluation.scenarios import ACCEPTANCE, SCENARIOS, build_records
 
     pool = {s.key: s for s in [*SCENARIOS, ACCEPTANCE]}
 

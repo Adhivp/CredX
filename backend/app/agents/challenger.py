@@ -32,6 +32,7 @@ DETERIORATING = {
     "sustained_deterioration",
     "accelerating_deterioration",
 }
+LLM_SOURCE = f"{AgentId.CHALLENGER.value}:llm"
 FAMILY_AGENT = {
     "repayment": AgentId.REPAYMENT,
     "cashflow": AgentId.CASHFLOW,
@@ -85,9 +86,17 @@ class Challenger:
         raised: list[ChallengeProposal] = []
 
         def seen(ctype: str, target: str) -> bool:
+            # Deterministic rules dedupe only against deterministic challenges, so an
+            # advisory LLM suggestion can never shadow a material rule-based challenge.
             return any(
-                c.challenge_type == ctype and c.target_id == target for c in view.challenges
+                c.challenge_type == ctype and c.target_id == target and c.raised_by != LLM_SOURCE
+                for c in view.challenges
             ) or any(c.challenge_type == ctype and c.target_id == target for c in raised)
+
+        def seen_any(ctype: str, target: str) -> bool:
+            return seen(ctype, target) or any(
+                c.challenge_type == ctype and c.target_id == target for c in view.challenges
+            )
 
         def status_of(code):
             h = view.hypothesis(code)
@@ -287,7 +296,7 @@ class Challenger:
                     )
                 )
 
-        raised.extend(self._llm_challenges(view, provisional, llm, seen))
+        raised.extend(self._llm_challenges(view, provisional, llm, seen_any))
         return raised
 
     @staticmethod
@@ -346,6 +355,7 @@ class Challenger:
                     "minor",
                     status="unresolved",
                     resolution="Advisory challenge for human review",
+                    raised_by=LLM_SOURCE,
                 )
             )
         return out

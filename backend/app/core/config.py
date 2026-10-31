@@ -36,3 +36,6 @@ class Settings(BaseSettings):
     institution_id: str = Field(default="default", min_length=1, max_length=64)
     # Run investigations in a background thread after the HTTP response (False in tests).
     investigations_async: bool = True
+    # Promotes this already-registered user to risk_admin at startup, only while no risk
+    # administrator exists. Lets a deployment create its first administrator.
+    bootstrap_admin_email: str = ""

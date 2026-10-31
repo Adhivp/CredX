@@ -42,7 +42,7 @@ _INJECTION = re.compile(
     r"(ignore (all |any )?(previous|prior|above) (instructions|prompts?)|disregard .{0,30}"
     r"instructions|you are now|system prompt|act as (an? )?(admin|administrator|system)|"
     r"</?(system|assistant|instructions?)>|approve (this|the) (case|loan|customer)|"
-    r"override (the )?(classification|policy|permissions?)|grant .{0,20}(role|permission))",
+    r"override (the )?(classification|policy|permissions?)|grant .{0,40}(role|permission))",
     re.IGNORECASE,
 )
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -203,8 +203,9 @@ class LLMGateway:
                 "content": (
                     "DATA (untrusted):\n<<<DATA\n"
                     + json.dumps(data, default=str, sort_keys=True)
-                    + "\nDATA>>>\nReturn JSON with exactly these fields: "
-                    + json.dumps(list(schema.model_json_schema().get("properties", {})))
+                    + "\nDATA>>>\nReturn one JSON object with exactly this shape and no "
+                    + "other keys: "
+                    + json.dumps(response_shape(schema))
                 ),
             },
         ]
@@ -264,6 +265,32 @@ class LLMGateway:
                 if not retryable:
                     return None
         return None
+
+
+def response_shape(model: type[BaseModel]) -> dict:
+    """A compact example of the expected JSON, including nested objects and lists.
+
+    Listing only top-level field names led the model to invent nested keys.
+    """
+    schema = model.model_json_schema()
+    defs = schema.get("$defs", {})
+
+    def walk(node):
+        if "$ref" in node:
+            return walk(defs[node["$ref"].rsplit("/", 1)[-1]])
+        if "anyOf" in node:
+            options = [o for o in node["anyOf"] if o.get("type") != "null"]
+            return walk(options[0]) if options else None
+        if "enum" in node:
+            return " | ".join(map(str, node["enum"]))
+        kind = node.get("type")
+        if kind == "object":
+            return {key: walk(value) for key, value in node.get("properties", {}).items()}
+        if kind == "array":
+            return [walk(node.get("items", {}))]
+        return f"<{kind or 'value'}>"
+
+    return walk(schema)
 
 
 def _parse_json(content: str) -> dict:

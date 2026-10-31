@@ -40,6 +40,8 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    if settings.bootstrap_admin_email:
+        bootstrap_admin(session_factory, settings.bootstrap_admin_email)
     app.include_router(router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(ews_router, prefix="/api/v1")
@@ -53,3 +55,33 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     return app
+
+
+def bootstrap_admin(session_factory, email: str) -> None:
+    from sqlalchemy import select
+    from sqlalchemy.exc import OperationalError
+
+    from app.models.governance import AuditLog
+    from app.models.user import User
+
+    try:
+        with session_factory() as db:
+            if db.scalar(select(User.id).where(User.role == "risk_admin").limit(1)):
+                return
+            account = db.scalar(select(User).where(User.email == email.lower()))
+            if account is None or not account.is_active:
+                return
+            account.role = "risk_admin"
+            db.add(
+                AuditLog(
+                    user_id=account.id,
+                    role="risk_admin",
+                    action="bootstrap_admin",
+                    resource_type="user",
+                    resource_id=account.id,
+                    outcome="allowed",
+                )
+            )
+            db.commit()
+    except OperationalError:
+        pass  # migrations not applied yet; nothing to bootstrap

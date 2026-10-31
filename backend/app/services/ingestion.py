@@ -8,6 +8,7 @@ permitted segment).
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -31,6 +32,12 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
     "cashflow": {"customer_id", "month", "monthly_inflow"},
 }
 MAX_TEXT = 64
+# Identifiers and labels are rendered by clients; restricting their characters at ingestion
+# removes markup and script injection through uploaded data.
+IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
+LABEL = re.compile(r"[A-Za-z0-9 _./&()+-]{0,64}")
+IDENTIFIER_FIELDS = {"customer_id", "loan_id", "facility_id"}
+DATE_FIELDS = {"due_date", "payment_date", "disbursement_date", "snapshot_date", "record_date"}
 
 
 @dataclass
@@ -50,7 +57,16 @@ def _clean(value) -> object:
 
 def _text(row: dict, key: str, default: str = "") -> str:
     value = _clean(row.get(key))
-    return default if value is None else str(value).strip()[:MAX_TEXT]
+    text = default if value is None else str(value).strip()
+    if key in IDENTIFIER_FIELDS:
+        if text and not IDENTIFIER.fullmatch(text):
+            raise ValueError(f"{key} has invalid characters or length")
+    elif key in DATE_FIELDS:
+        if text and not re.fullmatch(r"[0-9:./ T-]{0,32}", text):
+            raise ValueError(f"{key} is not a date")
+    elif not LABEL.fullmatch(text):
+        raise ValueError(f"{key} has invalid characters or length")
+    return text[:MAX_TEXT]
 
 
 def _num(row: dict, key: str, default: float = 0.0) -> float:
