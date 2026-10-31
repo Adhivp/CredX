@@ -38,14 +38,20 @@ export class CredxApi {
 	}
 
 	/**
-	 * Build full endpoint URL
+	 * Build full endpoint URL.
+	 * In browser on localhost/127.0.0.1, uses relative paths so the Astro/Vite proxy
+	 * routes requests smoothly without CORS preflight blocks.
 	 */
 	private url(endpoint: string): string {
 		const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-		// If running in browser and hitting same origin via proxy
-		if (typeof window !== 'undefined' && window.location.origin && window.location.hostname === 'localhost') {
-			// Can use direct URL or proxy
-			return `${this.baseUrl}${cleanEndpoint}`;
+		if (typeof window !== 'undefined') {
+			if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+				return cleanEndpoint;
+			}
+		}
+		const customBase = typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_API_URL;
+		if (customBase) {
+			return `${(customBase as string).replace(/\/+$/, '')}${cleanEndpoint}`;
 		}
 		return `${this.baseUrl}${cleanEndpoint}`;
 	}

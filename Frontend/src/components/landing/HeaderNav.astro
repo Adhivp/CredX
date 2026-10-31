@@ -42,28 +42,54 @@ import BrandLogo from '../common/BrandLogo.astro';
 </header>
 
 <script>
-	document.addEventListener('DOMContentLoaded', () => {
-		// Populate user name if available in session
-		const rawSession = sessionStorage.getItem('credx_user');
-		if (rawSession) {
-			try {
-				const user = JSON.parse(rawSession);
-				const nameEl = document.getElementById('nav-username');
-				const avatarEl = document.getElementById('nav-avatar');
-				if (user.name && nameEl) nameEl.textContent = user.name;
-				if (user.name && avatarEl) {
-					const initials = user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
-					avatarEl.textContent = initials;
-				}
-			} catch (e) {
-				// Fallback to default
+	import { api } from '../../lib/api';
+
+	document.addEventListener('DOMContentLoaded', async () => {
+		const nameEl = document.getElementById('nav-username');
+		const avatarEl = document.getElementById('nav-avatar');
+		const btnSignout = document.getElementById('btn-signout');
+
+		function renderUser(user: { full_name?: string; email?: string }) {
+			const fullName = user.full_name || 'Client';
+			if (nameEl) nameEl.textContent = fullName;
+			if (avatarEl) {
+				const initials = fullName
+					.split(' ')
+					.filter(Boolean)
+					.map((n: string) => n[0].toUpperCase())
+					.join('')
+					.slice(0, 2) || 'CX';
+				avatarEl.textContent = initials;
 			}
 		}
 
-		// Sign Out handler
-		const btnSignout = document.getElementById('btn-signout');
-		btnSignout?.addEventListener('click', () => {
-			sessionStorage.removeItem('credx_user');
+		// 1. Initial immediate render from cached local user
+		const cachedUser = api.getUser();
+		if (cachedUser) {
+			renderUser(cachedUser);
+		}
+
+		// 2. Verify with backend live session
+		if (api.isAuthenticated()) {
+			try {
+				const freshUser = await api.getMe();
+				renderUser(freshUser);
+			} catch (err) {
+				console.warn('Session verification failed:', err);
+				api.clearStorage();
+				window.location.href = '/';
+			}
+		} else {
+			// If not authenticated, redirect to portal login
+			window.location.href = '/';
+		}
+
+		// 3. Sign Out with backend revocation
+		btnSignout?.addEventListener('click', async () => {
+			if (btnSignout) {
+				btnSignout.setAttribute('style', 'opacity: 0.6; pointer-events: none;');
+			}
+			await api.logout();
 			window.location.href = '/';
 		});
 	});
