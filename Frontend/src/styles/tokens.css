@@ -1,0 +1,91 @@
+/* ==========================================================================
+   CredX Design System Tokens — Luxury Black, Gold & White Bank Palette
+   ========================================================================== */
+
+:root {
+	/* Brand Gold Spectrum (Primary Accent & Highlights) */
+	--gold-50: #FFFDF5;
+	--gold-100: #FFF9E6;
+	--gold-200: #FFF0BF;
+	--gold-300: #FFE699;
+	--gold-400: #FFD966;
+	--gold-500: #F5C518;  /* Core Gold */
+	--gold-600: #D4A912;
+	--gold-700: #B08D0E;
+	--gold-800: #8C700A;
+	--gold-900: #695307;
+
+	/* Gold Gradient Presets */
+	--gold-gradient: linear-gradient(135deg, #FFF0BF 0%, #F5C518 50%, #D4A912 100%);
+	--gold-gradient-hover: linear-gradient(135deg, #FFFFFF 0%, #FFD966 60%, #F5C518 100%);
+	--gold-gradient-card: linear-gradient(135deg, rgba(245, 197, 24, 0.18) 0%, rgba(212, 169, 18, 0.04) 100%);
+	--gold-border-gradient: linear-gradient(90deg, transparent, rgba(245, 197, 24, 0.4), transparent);
+
+	/* Deep Obsidian & Charcoal Scale (Backgrounds & Surfaces) */
+	--black-950: #050505;  /* Canvas Background */
+	--black-900: #0A0A0A;  /* Primary Card Surface */
+	--black-850: #0F0F0F;  /* Secondary Surface */
+	--black-800: #141414;  /* Tertiary / Floating Panes */
+	--black-750: #1A1A1A;  /* Input Base */
+	--black-700: #222222;  /* Input Hover / Focus */
+	--black-600: #2E2E2E;
+
+	/* Monochrome Alpha Hierarchy */
+	--white: #FFFFFF;
+	--white-90: rgba(255, 255, 255, 0.90);
+	--white-75: rgba(255, 255, 255, 0.75);
+	--white-60: rgba(255, 255, 255, 0.60);
+	--white-40: rgba(255, 255, 255, 0.40);
+	--white-20: rgba(255, 255, 255, 0.20);
+	--white-10: rgba(255, 255, 255, 0.10);
+	--white-05: rgba(255, 255, 255, 0.05);
+	--white-03: rgba(255, 255, 255, 0.03);
+
+	/* Semantic Colors */
+	--bg-canvas: var(--black-950);
+	--bg-surface: var(--black-900);
+	--bg-surface-elevated: var(--black-850);
+	--bg-input: var(--black-750);
+	--bg-input-active: var(--black-700);
+
+	--text-primary: var(--white);
+	--text-secondary: var(--white-75);
+	--text-muted: var(--white-40);
+	--text-accent: var(--gold-500);
+
+	--border-subtle: var(--white-05);
+	--border-medium: var(--white-10);
+	--border-strong: var(--white-20);
+	--border-accent: rgba(245, 197, 24, 0.35);
+
+	--status-success: #22C55E;
+	--status-warning: #F59E0B;
+	--status-danger: #EF4444;
+	--status-info: #3B82F6;
+
+	/* Typography */
+	--font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+	/* Border Radii */
+	--radius-xs: 0.25rem;
+	--radius-sm: 0.5rem;
+	--radius-md: 0.75rem;
+	--radius-lg: 1rem;
+	--radius-xl: 1.5rem;
+	--radius-2xl: 2rem;
+	--radius-full: 9999px;
+
+	/* Luxury Box Shadows */
+	--shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.5);
+	--shadow-card: 0 16px 40px rgba(0, 0, 0, 0.6);
+	--shadow-float: 0 24px 60px rgba(0, 0, 0, 0.75);
+	--shadow-gold: 0 4px 24px rgba(245, 197, 24, 0.22);
+	--shadow-gold-lg: 0 10px 40px rgba(245, 197, 24, 0.35);
+
+	/* Transitions */
+	--ease-fast: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-base: 260ms cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-slow: 450ms cubic-bezier(0.16, 1, 0.3, 1);
+}

@@ -1,0 +1,70 @@
+---
+import BrandLogo from '../common/BrandLogo.astro';
+---
+
+<header class="landing-nav" id="landing-navbar">
+	<div class="nav-brand-group">
+		<a href="/landing" class="nav-logo-link">
+			<BrandLogo size="sm" />
+		</a>
+		<div class="nav-live-pill">
+			<span class="nav-live-dot"></span>
+			<span>Secured Session</span>
+		</div>
+	</div>
+
+	<nav class="nav-menu-links">
+		<a href="#overview" class="nav-link active">Overview</a>
+		<a href="#cards" class="nav-link">Cards</a>
+		<a href="#transfers" class="nav-link">Transfers</a>
+		<a href="#vaults" class="nav-link">Wealth Vaults</a>
+		<a href="#concierge" class="nav-link">Concierge</a>
+	</nav>
+
+	<div class="nav-client-actions">
+		<div class="client-profile-chip" id="user-profile-chip">
+			<div class="client-avatar" id="nav-avatar">AV</div>
+			<div class="client-info">
+				<span class="client-name" id="nav-username">Alexander Vance</span>
+				<span class="client-tier">Private Black Tier</span>
+			</div>
+		</div>
+
+		<button type="button" class="btn-signout" id="btn-signout" aria-label="Sign out of account">
+			<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/>
+				<polyline points="16 17 21 12 16 7" stroke-linecap="round" stroke-linejoin="round"/>
+				<line x1="21" y1="12" x2="9" y2="12" stroke-linecap="round" stroke-linejoin="round"/>
+			</svg>
+			<span>Sign Out</span>
+		</button>
+	</div>
+</header>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		// Populate user name if available in session
+		const rawSession = sessionStorage.getItem('credx_user');
+		if (rawSession) {
+			try {
+				const user = JSON.parse(rawSession);
+				const nameEl = document.getElementById('nav-username');
+				const avatarEl = document.getElementById('nav-avatar');
+				if (user.name && nameEl) nameEl.textContent = user.name;
+				if (user.name && avatarEl) {
+					const initials = user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+					avatarEl.textContent = initials;
+				}
+			} catch (e) {
+				// Fallback to default
+			}
+		}
+
+		// Sign Out handler
+		const btnSignout = document.getElementById('btn-signout');
+		btnSignout?.addEventListener('click', () => {
+			sessionStorage.removeItem('credx_user');
+			window.location.href = '/';
+		});
+	});
+</script>

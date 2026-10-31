@@ -1,0 +1,66 @@
+---
+// Account Balance & Overview Component
+---
+
+<div class="balance-card">
+	<div class="balance-header-row">
+		<div>
+			<p class="balance-greeting">Private Wealth Management</p>
+			<h1 class="client-greeting-title">Welcome back, <span id="hero-client-name">Alexander</span></h1>
+		</div>
+		<div class="account-badge">
+			<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+				<rect x="2" y="7" width="20" height="14" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+				<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke-linecap="round" stroke-linejoin="round"/>
+			</svg>
+			<span>Account CX-8842-9901</span>
+		</div>
+	</div>
+
+	<div class="balance-figure-group">
+		<span class="balance-label">Total Liquid Net Worth</span>
+		<div class="balance-number">$248,650.00</div>
+		<div class="balance-meta-row">
+			<div class="yield-pill">
+				<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+					<polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke-linecap="round" stroke-linejoin="round"/>
+					<polyline points="17 6 23 6 23 12" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+				<span>+2.84% (+$6,870.40 30d)</span>
+			</div>
+			<span class="meta-caption">Audited in Real-Time via Smart Ledger</span>
+		</div>
+	</div>
+
+	<div class="balance-stats-bar">
+		<div class="substat-item">
+			<span class="substat-label">Prime Vault</span>
+			<span class="substat-val gold">$180,000.00</span>
+		</div>
+		<div class="substat-item">
+			<span class="substat-label">Offshore EUR</span>
+			<span class="substat-val">€42,100.00</span>
+		</div>
+		<div class="substat-item">
+			<span class="substat-label">Daily Spend Limit</span>
+			<span class="substat-val">$50,000.00</span>
+		</div>
+	</div>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const rawSession = sessionStorage.getItem('credx_user');
+		if (rawSession) {
+			try {
+				const user = JSON.parse(rawSession);
+				const heroName = document.getElementById('hero-client-name');
+				if (user.name && heroName) {
+					heroName.textContent = user.name.split(' ')[0];
+				}
+			} catch (e) {
+				// Fallback
+			}
+		}
+	});
+</script>

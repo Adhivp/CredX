@@ -1,0 +1,23 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AmbientMesh from '../components/common/AmbientMesh.astro';
+import BrandShowcase from '../components/auth/BrandShowcase.astro';
+import LoginForm from '../components/auth/LoginForm.astro';
+---
+
+<Layout title="CredX — Premium Digital Banking | Sign In" description="Secure client authentication portal for CredX private banking and wealth management.">
+	<main class="auth-container" id="auth-page">
+		<!-- Ambient Gold Glow & Mesh Background -->
+		<AmbientMesh />
+
+		<!-- Left Showcase Panel -->
+		<BrandShowcase />
+
+		<!-- Right Authentication Card -->
+		<LoginForm />
+	</main>
+</Layout>
+
+<style>
+	@import '../styles/auth.css';
+</style>
