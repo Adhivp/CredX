@@ -1,22 +1,62 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import AmbientMesh from "../components/common/AmbientMesh.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
 ---
 
-<Layout title="CredX — EWS Dashboard">
+<Layout title="CredX — Early Warning Risk Intelligence Dashboard">
   <div class="dash-layout">
-    <DashboardNav active="dashboard" />
-    <main class="dash-main">
-      <div class="dash-header">
-        <h1>Early Warning <span>Dashboard</span></h1>
-        <div class="dash-actions">
-          <a href="/upload" class="btn btn-secondary">⬆ Upload Data</a>
-          <button id="assessBtn" class="btn btn-primary">▶ Run Assessment</button>
-        </div>
-      </div>
+    <!-- Ambient Gold Background Glow -->
+    <AmbientMesh />
 
-      <div id="content">
-        <div class="loading">Loading portfolio data…</div>
+    <!-- Sleek Institutional Sidebar -->
+    <DashboardNav active="dashboard" />
+
+    <!-- Main Dashboard Body -->
+    <main class="dash-main">
+      <!-- Top Header Row -->
+      <header class="dash-header">
+        <div class="header-titles">
+          <div class="header-badge-row">
+            <span class="header-date" id="current-system-time"></span>
+          </div>
+          <h1 class="dash-title">Early Warning <span class="gold-gradient-text">Dashboard</span></h1>
+          <p class="dash-subtitle">
+            Machine Learning credit delinquency forecasting & high-risk corporate debtor detection.
+          </p>
+        </div>
+
+        <div class="dash-actions">
+          <a href="/upload" class="btn btn-glass">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span>Upload Portfolio</span>
+          </a>
+          <button id="assessBtn" class="btn btn-gold">
+            <svg class="btn-sparkle-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span id="assessBtnText">Run AI Assessment</span>
+          </button>
+          <OfficerProfileHeader />
+        </div>
+      </header>
+
+      <!-- Dynamic Content Area -->
+      <div id="content" class="dash-content-container">
+        <!-- Skeleton Loading Placeholders -->
+        <div class="skeleton-grid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+        <div class="skeleton-panel" style="height: 180px; margin-top: 1.5rem;"></div>
+        <div class="skeleton-panel" style="height: 320px; margin-top: 1.5rem;"></div>
       </div>
     </main>
   </div>
@@ -24,105 +64,401 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
 
 <script>
   const API = '/api/v1/ews';
+  let cachedData: any = null;
+  let activeFilter = 'ALL';
+  let searchQuery = '';
+
+  // Format local system timestamp
+  function updateTimestamp() {
+    const timeEl = document.getElementById('current-system-time');
+    if (timeEl) {
+      const now = new Date();
+      timeEl.textContent = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  }
+  updateTimestamp();
 
   async function loadDashboard() {
     const container = document.getElementById('content');
+    if (!container) return;
+
     try {
       const res = await fetch(`${API}/portfolio`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
+      cachedData = data;
       renderDashboard(data, container);
-    } catch (err) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠</div>Could not load data. Is the backend running?<br><small>${err.message}</small></div>`;
+    } catch (err: any) {
+      container.innerHTML = `
+        <div class="empty-state-card">
+          <div class="empty-icon-box">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#EF4444" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h3 class="empty-title">Unable to Connect to Risk Engine</h3>
+          <p class="empty-desc">Could not retrieve portfolio assessments. Please verify backend is running on port 8000.</p>
+          <button class="btn btn-glass" onclick="location.reload()">Retry Connection</button>
+        </div>
+      `;
     }
   }
 
-  function renderDashboard(data, container) {
+  function getScoreGradient(score: number): { color: string; bg: string; label: string } {
+    if (score >= 70) return { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.14)', label: 'CRITICAL' };
+    if (score >= 50) return { color: '#F97316', bg: 'rgba(249, 115, 22, 0.14)', label: 'HIGH' };
+    if (score >= 25) return { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.14)', label: 'MEDIUM' };
+    return { color: '#10B981', bg: 'rgba(16, 185, 129, 0.14)', label: 'LOW' };
+  }
+
+  function parseIndicatorTag(ind: string): string {
+    let clean = ind.trim();
+    if (clean.includes(':')) {
+      const parts = clean.split(':');
+      return `<span class="indicator-chip" title="${clean}"><span class="chip-accent">⚠️</span> ${parts[0]} <strong class="chip-val">${parts[1]}</strong></span>`;
+    }
+    return `<span class="indicator-chip" title="${clean}"><span class="chip-accent">📌</span> ${clean}</span>`;
+  }
+
+  function renderDashboard(data: any, container: HTMLElement) {
     const dist = data.risk_distribution || {};
     const total = (dist.Low || 0) + (dist.Medium || 0) + (dist.High || 0) + (dist.Critical || 0);
 
-    const pctLow = total ? ((dist.Low || 0) / total * 100) : 0;
-    const pctMed = total ? ((dist.Medium || 0) / total * 100) : 0;
-    const pctHigh = total ? ((dist.High || 0) / total * 100) : 0;
-    const pctCrit = total ? ((dist.Critical || 0) / total * 100) : 0;
+    const pctLow = total ? Math.round(((dist.Low || 0) / total) * 100) : 0;
+    const pctMed = total ? Math.round(((dist.Medium || 0) / total) * 100) : 0;
+    const pctHigh = total ? Math.round(((dist.High || 0) / total) * 100) : 0;
+    const pctCrit = total ? Math.round(((dist.Critical || 0) / total) * 100) : 0;
 
-    const topRows = (data.top_risky_customers || []).map(c => {
-      const badgeCls = `badge-${c.risk_category.toLowerCase()}`;
-      const indicators = (c.top_indicators || []).slice(0, 2).join('; ');
-      return `<tr class="clickable" onclick="window.location='/customer/${c.customer_id}'">
-        <td class="mono">${c.customer_id}</td>
-        <td class="score-cell">${c.warning_score.toFixed(1)}</td>
-        <td><span class="badge ${badgeCls}">${c.risk_category}</span></td>
-        <td>${indicators || '—'}</td>
-      </tr>`;
-    }).join('');
+    const highPlusCritical = (dist.High || 0) + (dist.Critical || 0);
+
+    // Filter customers based on active selection
+    let filteredCustomers = (data.top_risky_customers || []).filter((c: any) => {
+      const matchSearch = c.customer_id.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchSearch) return false;
+      if (activeFilter === 'ALL') return true;
+      if (activeFilter === 'HIGH_CRIT') return c.risk_category === 'High' || c.risk_category === 'Critical';
+      return c.risk_category.toUpperCase() === activeFilter;
+    });
+
+    const rowsHtml = filteredCustomers.length > 0 ? filteredCustomers.map((c: any) => {
+      const scoreMeta = getScoreGradient(c.warning_score);
+      const indicatorTags = (c.top_indicators || [])
+        .slice(0, 2)
+        .map((ind: string) => parseIndicatorTag(ind))
+        .join('');
+
+      return `
+        <tr class="table-row-clickable" onclick="window.location='/customer/${c.customer_id}'">
+          <td class="customer-cell">
+            <div class="customer-avatar">${c.customer_id.slice(-2)}</div>
+            <div class="customer-id-group">
+              <span class="customer-id-badge">${c.customer_id}</span>
+              <span class="customer-subtext">Commercial Credit</span>
+            </div>
+          </td>
+          <td class="score-cell">
+            <div class="score-display-row">
+              <div class="score-mini-bar-track">
+                <div class="score-mini-bar-fill" style="width: ${Math.min(c.warning_score, 100)}%; background: ${scoreMeta.color};"></div>
+              </div>
+              <span class="score-number-text" style="color: ${scoreMeta.color};">${c.warning_score.toFixed(1)}</span>
+            </div>
+          </td>
+          <td class="risk-cell">
+            <span class="risk-level-badge" style="color: ${scoreMeta.color}; background: ${scoreMeta.bg}; border-color: ${scoreMeta.color}40;">
+              <span class="risk-dot" style="background: ${scoreMeta.color};"></span>
+              ${c.risk_category}
+            </span>
+          </td>
+          <td class="indicators-cell">
+            <div class="indicator-chips-wrap">
+              ${indicatorTags || '<span class="text-muted">—</span>'}
+            </div>
+          </td>
+          <td class="action-cell">
+            <a href="/customer/${c.customer_id}" class="action-inspect-link" onclick="event.stopPropagation()">
+              <span>Inspect</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </a>
+          </td>
+        </tr>
+      `;
+    }).join('') : `
+      <tr>
+        <td colspan="5" class="table-empty-row">
+          <div class="empty-table-placeholder">No customers found matching filter "${activeFilter}".</div>
+        </td>
+      </tr>
+    `;
 
     container.innerHTML = `
-      <div class="stat-cards">
+      <!-- Stat Cards Grid -->
+      <section class="stat-cards-grid" aria-label="Key Portfolio Metrics">
+        <!-- Card 1: Total Portfolio -->
         <div class="stat-card">
-          <div class="stat-card-label">Total Customers</div>
-          <div class="stat-card-value">${data.total_customers}</div>
+          <div class="stat-card-header">
+            <span class="stat-card-label">Total Debtors</span>
+            <div class="stat-icon-bubble gold">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-card-val-row">
+            <span class="stat-main-number">${data.total_customers}</span>
+            <span class="stat-trend-tag positive">Active Base</span>
+          </div>
+          <div class="stat-card-footer-caption">Institutional commercial facilities</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-card-label">Assessed</div>
-          <div class="stat-card-value gold">${data.total_assessed}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-label">Avg Warning Score</div>
-          <div class="stat-card-value">${data.average_warning_score.toFixed(1)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-label">High + Critical</div>
-          <div class="stat-card-value" style="color: #F97316">${(dist.High || 0) + (dist.Critical || 0)}</div>
-        </div>
-      </div>
 
-      <div class="risk-bar-container">
-        <h3>Risk Distribution</h3>
-        ${total > 0 ? `
-        <div class="risk-bar">
-          ${pctLow > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctLow}%;background:#22C55E">${dist.Low}</div>` : ''}
-          ${pctMed > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctMed}%;background:#F59E0B">${dist.Medium}</div>` : ''}
-          ${pctHigh > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctHigh}%;background:#F97316">${dist.High}</div>` : ''}
-          ${pctCrit > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctCrit}%;background:#EF4444">${dist.Critical}</div>` : ''}
+        <!-- Card 2: Assessed Portfolio -->
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Assessed Coverage</span>
+            <div class="stat-icon-bubble emerald">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-card-val-row">
+            <span class="stat-main-number gold-glow">${data.total_assessed}</span>
+            <span class="stat-trend-tag gold">100% Scored</span>
+          </div>
+          <div class="stat-card-footer-caption">Evaluated via AI risk matrix</div>
         </div>
-        ` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No assessments yet. Upload data and run assessment.</div>'}
-        <div class="risk-bar-legend">
-          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#22C55E"></span> Low (${dist.Low || 0})</div>
-          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F59E0B"></span> Medium (${dist.Medium || 0})</div>
-          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F97316"></span> High (${dist.High || 0})</div>
-          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#EF4444"></span> Critical (${dist.Critical || 0})</div>
-        </div>
-      </div>
 
-      <div class="data-table-wrap">
-        <h3>Top Risky Customers</h3>
-        ${topRows ? `
-        <table class="data-table">
-          <thead><tr><th>Customer</th><th>Score</th><th>Risk</th><th>Key Indicators</th></tr></thead>
-          <tbody>${topRows}</tbody>
-        </table>` : '<div class="empty-state">No assessed customers yet</div>'}
-      </div>
+        <!-- Card 3: Average Warning Score -->
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">Avg Warning Score</span>
+            <div class="stat-icon-bubble amber">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-card-val-row">
+            <span class="stat-main-number">${data.average_warning_score.toFixed(1)}</span>
+            <span class="stat-score-scale">/ 100</span>
+          </div>
+          <div class="stat-card-footer-caption">Risk threshold: 45.0 baseline</div>
+        </div>
+
+        <!-- Card 4: High + Critical Exposure -->
+        <div class="stat-card alert-tint">
+          <div class="stat-card-header">
+            <span class="stat-card-label">High + Critical Exposure</span>
+            <div class="stat-icon-bubble coral">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-card-val-row">
+            <span class="stat-main-number coral-glow">${highPlusCritical}</span>
+            <span class="stat-trend-tag alert-danger">
+              <span class="pulse-dot-coral"></span>
+              Attention
+            </span>
+          </div>
+          <div class="stat-card-footer-caption">${total ? Math.round((highPlusCritical / total) * 100) : 0}% of portfolio at elevated risk</div>
+        </div>
+      </section>
+
+      <!-- Risk Distribution Visual Spectrum -->
+      <section class="risk-spectrum-panel">
+        <div class="spectrum-header">
+          <div>
+            <span class="spectrum-eyebrow">PORTFOLIO EXPOSURE SPECTRUM</span>
+            <h2 class="spectrum-title">Credit Risk Distribution</h2>
+          </div>
+          <div class="spectrum-meta-badge">
+            <span>${total} Customers Analyzed</span>
+          </div>
+        </div>
+
+        <!-- Segmented Glow Bar -->
+        <div class="spectrum-bar-track">
+          ${pctLow > 0 ? `<div class="spectrum-segment seg-low" style="flex-basis: ${pctLow}%;" title="Low Risk: ${dist.Low || 0} (${pctLow}%)"><span class="seg-label">${dist.Low} Low (${pctLow}%)</span></div>` : ''}
+          ${pctMed > 0 ? `<div class="spectrum-segment seg-med" style="flex-basis: ${pctMed}%;" title="Medium Risk: ${dist.Medium || 0} (${pctMed}%)"><span class="seg-label">${dist.Medium} Med (${pctMed}%)</span></div>` : ''}
+          ${pctHigh > 0 ? `<div class="spectrum-segment seg-high" style="flex-basis: ${pctHigh}%;" title="High Risk: ${dist.High || 0} (${pctHigh}%)"><span class="seg-label">${dist.High} High (${pctHigh}%)</span></div>` : ''}
+          ${pctCrit > 0 ? `<div class="spectrum-segment seg-crit" style="flex-basis: ${pctCrit}%;" title="Critical Risk: ${dist.Critical || 0} (${pctCrit}%)"><span class="seg-label">${dist.Critical} Crit</span></div>` : ''}
+        </div>
+
+        <!-- Interactive Category Cards -->
+        <div class="spectrum-cards-grid">
+          <!-- Low Card -->
+          <div class="spectrum-cat-card ${activeFilter === 'LOW' ? 'active-filter' : ''}" data-filter="LOW">
+            <div class="cat-top">
+              <span class="cat-indicator-dot dot-low"></span>
+              <span class="cat-name">Low Risk</span>
+            </div>
+            <div class="cat-count-row">
+              <span class="cat-count">${dist.Low || 0}</span>
+              <span class="cat-pct">${pctLow}%</span>
+            </div>
+            <span class="cat-desc">Score &lt; 25 · Safe standing</span>
+          </div>
+
+          <!-- Medium Card -->
+          <div class="spectrum-cat-card ${activeFilter === 'MEDIUM' ? 'active-filter' : ''}" data-filter="MEDIUM">
+            <div class="cat-top">
+              <span class="cat-indicator-dot dot-med"></span>
+              <span class="cat-name">Medium Risk</span>
+            </div>
+            <div class="cat-count-row">
+              <span class="cat-count">${dist.Medium || 0}</span>
+              <span class="cat-pct">${pctMed}%</span>
+            </div>
+            <span class="cat-desc">Score 25–49 · Watch list</span>
+          </div>
+
+          <!-- High Card -->
+          <div class="spectrum-cat-card ${activeFilter === 'HIGH' ? 'active-filter' : ''}" data-filter="HIGH">
+            <div class="cat-top">
+              <span class="cat-indicator-dot dot-high"></span>
+              <span class="cat-name">High Risk</span>
+            </div>
+            <div class="cat-count-row">
+              <span class="cat-count coral-text">${dist.High || 0}</span>
+              <span class="cat-pct">${pctHigh}%</span>
+            </div>
+            <span class="cat-desc">Score 50–69 · Delinquent pattern</span>
+          </div>
+
+          <!-- Critical Card -->
+          <div class="spectrum-cat-card ${activeFilter === 'CRITICAL' ? 'active-filter' : ''}" data-filter="CRITICAL">
+            <div class="cat-top">
+              <span class="cat-indicator-dot dot-crit"></span>
+              <span class="cat-name">Critical Risk</span>
+            </div>
+            <div class="cat-count-row">
+              <span class="cat-count red-text">${dist.Critical || 0}</span>
+              <span class="cat-pct">${pctCrit}%</span>
+            </div>
+            <span class="cat-desc">Score 70+ · Imminent default</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Risky Customers Dossier Table -->
+      <section class="table-card-container">
+        <div class="table-card-header">
+          <div>
+            <span class="table-eyebrow">PORTFOLIO VULNERABILITY RANKING</span>
+            <h2 class="table-title">Top Risky Debtors</h2>
+          </div>
+
+          <!-- Filter Tabs & Quick Search -->
+          <div class="table-controls-row">
+            <div class="search-input-wrapper">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" id="custSearchInput" class="table-search-input" placeholder="Search customer ID..." value="${searchQuery}" />
+            </div>
+
+            <div class="filter-pills-group">
+              <button class="filter-pill ${activeFilter === 'ALL' ? 'active' : ''}" data-filter="ALL">All (${data.top_risky_customers.length})</button>
+              <button class="filter-pill ${activeFilter === 'HIGH_CRIT' ? 'active' : ''}" data-filter="HIGH_CRIT">High & Critical (${highPlusCritical})</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-scroll-frame">
+          <table class="luxury-data-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">Customer</th>
+                <th style="width: 22%;">Warning Score</th>
+                <th style="width: 15%;">Risk Tier</th>
+                <th style="width: 33%;">Key Delinquency Indicators</th>
+                <th style="width: 10%; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </section>
     `;
+
+    // Attach listeners to spectrum cards
+    document.querySelectorAll('.spectrum-cat-card').forEach((el) => {
+      el.addEventListener('click', () => {
+        const f = el.getAttribute('data-filter') || 'ALL';
+        activeFilter = activeFilter === f ? 'ALL' : f;
+        renderDashboard(cachedData, container);
+      });
+    });
+
+    // Attach listeners to filter pills
+    document.querySelectorAll('.filter-pill').forEach((el) => {
+      el.addEventListener('click', () => {
+        activeFilter = el.getAttribute('data-filter') || 'ALL';
+        renderDashboard(cachedData, container);
+      });
+    });
+
+    // Search input listener
+    const searchEl = document.getElementById('custSearchInput') as HTMLInputElement | null;
+    if (searchEl) {
+      searchEl.addEventListener('input', (e: any) => {
+        searchQuery = e.target.value;
+        renderDashboard(cachedData, container);
+        const refocused = document.getElementById('custSearchInput') as HTMLInputElement | null;
+        if (refocused) {
+          refocused.focus();
+          refocused.setSelectionRange(searchQuery.length, searchQuery.length);
+        }
+      });
+    }
   }
 
-  document.getElementById('assessBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('assessBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Assessing…';
+  // Handle Assessment Button with loading animation
+  const assessBtn = document.getElementById('assessBtn') as HTMLButtonElement | null;
+  const assessBtnText = document.getElementById('assessBtnText');
+
+  assessBtn?.addEventListener('click', async () => {
+    if (!assessBtn || !assessBtnText) return;
+    assessBtn.disabled = true;
+    assessBtn.classList.add('is-running');
+    assessBtnText.textContent = 'Processing AI Matrix…';
+
     try {
       const res = await fetch(`${API}/assess`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      btn.textContent = `✓ ${data.total_assessed} assessed`;
-      setTimeout(() => loadDashboard(), 500);
+      assessBtnText.textContent = `✓ ${data.total_assessed} Evaluated!`;
+      setTimeout(() => loadDashboard(), 600);
     } catch (err) {
-      btn.textContent = '✗ Failed';
+      assessBtnText.textContent = 'Assessment Failed';
     }
+
     setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = '▶ Run Assessment';
-    }, 2500);
+      assessBtn.disabled = false;
+      assessBtn.classList.remove('is-running');
+      assessBtnText.textContent = 'Run AI Assessment';
+    }, 2800);
   });
 
   loadDashboard();

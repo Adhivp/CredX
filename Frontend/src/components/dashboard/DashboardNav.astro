@@ -5,29 +5,81 @@ interface Props {
 const { active = "dashboard" } = Astro.props;
 ---
 
-<nav class="dash-nav">
-  <div class="dash-nav-logo">
-    <img src="/logo.png" alt="CredX" />
-    <span>CredX</span>
+<aside class="dash-nav" id="dash-sidebar">
+  <div class="dash-nav-top">
+    <!-- Brand Logo & System Title -->
+    <a href="/dashboard" class="dash-nav-brand">
+      <div class="brand-logo-frame">
+        <img src="/logo.png" alt="CredX Emblem" class="brand-logo-img" />
+      </div>
+      <div class="brand-text-block">
+        <span class="brand-name">Cred<span class="gold-text">X</span></span>
+        <span class="brand-subtext">Risk Intelligence</span>
+      </div>
+    </a>
+
+    <!-- Engine Status Pill -->
+    <div class="engine-status-pill">
+      <span class="pulse-dot"></span>
+      <span class="status-label">ML Risk Engine Live</span>
+    </div>
+
+    <!-- Navigation Section -->
+    <div class="nav-section-title">PORTFOLIO MONITORING</div>
+    <ul class="dash-nav-links">
+      <li>
+        <a href="/dashboard" class={`nav-item ${active === "dashboard" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+            </svg>
+          </span>
+          <span class="nav-text">Overview</span>
+          {active === "dashboard" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+      <li>
+        <a href="/watchlist" class={`nav-item ${active === "watchlist" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
+          <span class="nav-text">Risk Watchlist</span>
+          {active === "watchlist" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+      <li>
+        <a href="/upload" class={`nav-item ${active === "upload" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </span>
+          <span class="nav-text">Upload Portfolio</span>
+          {active === "upload" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+    </ul>
   </div>
-  <ul class="dash-nav-links">
-    <li>
-      <a href="/dashboard" class={active === "dashboard" ? "active" : ""}>
-        <span class="nav-icon">◉</span>
-        <span>Dashboard</span>
-      </a>
-    </li>
-    <li>
-      <a href="/watchlist" class={active === "watchlist" ? "active" : ""}>
-        <span class="nav-icon">⚠</span>
-        <span>Watchlist</span>
-      </a>
-    </li>
-    <li>
-      <a href="/upload" class={active === "upload" ? "active" : ""}>
-        <span class="nav-icon">⬆</span>
-        <span>Upload</span>
-      </a>
-    </li>
-  </ul>
-</nav>
+
+  <!-- System Status Footer -->
+  <div class="dash-nav-bottom">
+    <div class="nav-divider"></div>
+    <div class="sidebar-status-card">
+      <div class="sidebar-status-row">
+        <span class="pulse-dot-emerald"></span>
+        <span class="sidebar-status-title">Secured Risk Terminal</span>
+      </div>
+      <span class="sidebar-status-sub">CredX Intelligence • v2.4</span>
+    </div>
+  </div>
+</aside>
+

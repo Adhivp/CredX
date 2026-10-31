@@ -1,7 +1,7 @@
 import time
 import uuid
 
-from sqlalchemy import String
+from sqlalchemy import Float, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -18,3 +18,7 @@ class User(Base):
     failed_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[int] = mapped_column(default=lambda: int(time.time()))
+    # Self-registration never grants a role; a risk administrator assigns one.
+    role: Mapped[str] = mapped_column(String(32), default="unassigned", server_default="unassigned")
+    # Maximum exposure this user may approve under institutional delegation (managers only).
+    approval_limit: Mapped[float | None] = mapped_column(Float, nullable=True)

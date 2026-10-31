@@ -2,8 +2,7 @@ from alembic import context
 
 from app.core.config import Settings
 from app.db.session import Base, configure_database
-from app.models.auth_session import AuthSession  # noqa: F401
-from app.models.user import User  # noqa: F401
+from app.models import auth_session, ews, governance, investigation, user  # noqa: F401
 
 settings = Settings()
 target_metadata = Base.metadata
