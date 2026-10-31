@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'core/rules/**'
+      - 'core/models/**'
       - 'core/__init__.py'
       - '.dockerignore'
       - 'catalyst.json'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'backend/**'
       - 'core/rules/**'
+      - 'core/models/**'
       - 'core/__init__.py'
       - '.dockerignore'
       - 'catalyst.json'
