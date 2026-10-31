@@ -13,7 +13,7 @@
 				<rect x="2" y="7" width="20" height="14" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
 				<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke-linecap="round" stroke-linejoin="round"/>
 			</svg>
-			<span>Account CX-8842-9901</span>
+			<span id="hero-account-id">Account CX-8842-9901</span>
 		</div>
 	</div>
 
@@ -49,18 +49,21 @@
 </div>
 
 <script>
+	import { api } from '../../lib/api';
+
 	document.addEventListener('DOMContentLoaded', () => {
-		const rawSession = sessionStorage.getItem('credx_user');
-		if (rawSession) {
-			try {
-				const user = JSON.parse(rawSession);
-				const heroName = document.getElementById('hero-client-name');
-				if (user.name && heroName) {
-					heroName.textContent = user.name.split(' ')[0];
-				}
-			} catch (e) {
-				// Fallback
+		const updateGreeting = (user: { full_name?: string; id?: string }) => {
+			const heroName = document.getElementById('hero-client-name');
+			const accountIdEl = document.getElementById('hero-account-id');
+			if (user.full_name && heroName) {
+				heroName.textContent = user.full_name.split(' ')[0];
 			}
-		}
+			if (user.id && accountIdEl) {
+				accountIdEl.textContent = `Account CX-${user.id.slice(0, 8).toUpperCase()}`;
+			}
+		};
+
+		const cachedUser = api.getUser();
+		if (cachedUser) updateGreeting(cachedUser);
 	});
 </script>
