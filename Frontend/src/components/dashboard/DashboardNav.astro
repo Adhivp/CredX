@@ -1,0 +1,33 @@
+---
+interface Props {
+  active?: string;
+}
+const { active = "dashboard" } = Astro.props;
+---
+
+<nav class="dash-nav">
+  <div class="dash-nav-logo">
+    <img src="/logo.png" alt="CredX" />
+    <span>CredX</span>
+  </div>
+  <ul class="dash-nav-links">
+    <li>
+      <a href="/dashboard" class={active === "dashboard" ? "active" : ""}>
+        <span class="nav-icon">◉</span>
+        <span>Dashboard</span>
+      </a>
+    </li>
+    <li>
+      <a href="/watchlist" class={active === "watchlist" ? "active" : ""}>
+        <span class="nav-icon">⚠</span>
+        <span>Watchlist</span>
+      </a>
+    </li>
+    <li>
+      <a href="/upload" class={active === "upload" ? "active" : ""}>
+        <span class="nav-icon">⬆</span>
+        <span>Upload</span>
+      </a>
+    </li>
+  </ul>
+</nav>

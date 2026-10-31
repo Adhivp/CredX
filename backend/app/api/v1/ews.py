@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -325,12 +325,14 @@ def run_assessment(
         miss_score = miss.score if miss else 0.0
         completeness_score = hist.completeness_score if hist else 100.0
 
-        # Weighted composite
-        warning_score = delay_score * 0.35 + miss_score * 0.25 + completeness_score * 0.0 + 0.0
-        # Normalise: completeness is inverted (high = good), we want risk score
-        incompleteness_penalty = max(0, (50 - completeness_score)) * 0.3
-        warning_score = delay_score * 0.35 + miss_score * 0.25 + incompleteness_penalty
-        warning_score = min(warning_score, 100.0)
+        # Weighted composite: delay 40%, miss 30%, completeness penalty 15%
+        incompleteness_risk = max(0, 100 - completeness_score)
+        warning_score = (
+            delay_score * 0.40
+            + miss_score * 0.30
+            + incompleteness_risk * 0.15
+        )
+        warning_score = min(max(warning_score, 0.0), 100.0)
 
         indicators = []
         if delay:
@@ -538,9 +540,7 @@ def classify_alert(assessment_id: str, body: AlertCreate, db: Session = Depends(
 
 
 @router.post("/explain/{customer_id}", response_model=ExplainResponse)
-def explain_customer(customer_id: str, db: Session = Depends(get_db)):
-    from fastapi import Request
-
+def explain_customer(customer_id: str, request: Request, db: Session = Depends(get_db)):
     cust = db.execute(select(Customer).where(Customer.customer_id == customer_id)).scalar_one_or_none()
     if not cust:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -564,12 +564,7 @@ def explain_customer(customer_id: str, db: Session = Depends(get_db)):
         "cashflow": assessment.cashflow_score,
     }
 
-    # Get settings from app state — use a fallback approach
-    from app.core.config import Settings
-    try:
-        settings = Settings()
-    except Exception:
-        settings = type("S", (), {"nebius_api_key": "", "nebius_base_url": "", "nebius_model": ""})()
+    settings = request.app.state.settings
 
     result = explain_assessment(
         customer_id=customer_id,
