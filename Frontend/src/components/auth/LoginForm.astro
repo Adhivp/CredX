@@ -375,19 +375,30 @@ import BrandLogo from '../common/BrandLogo.astro';
 			}
 		});
 
-		// Demo SSO fallback
-		document.getElementById('sso-google')?.addEventListener('click', async () => {
+		// Check if already authenticated on initial load
+		if (api.isAuthenticated()) {
+			api.getMe()
+				.then(() => {
+					window.location.href = '/landing';
+				})
+				.catch(() => {
+					api.clearStorage();
+				});
+		}
+
+		// Demo SSO Quick Login with live backend accounts
+		document.getElementById('sso-google')?.addEventListener('click', () => {
 			if (emailInput && passwordInput) {
 				emailInput.value = 'demo@credx.com';
-				passwordInput.value = 'DemoCredXPass123!';
+				passwordInput.value = 'CredXDemoPass2026!';
 				form?.dispatchEvent(new Event('submit', { cancelable: true }));
 			}
 		});
 
-		document.getElementById('sso-apple')?.addEventListener('click', async () => {
+		document.getElementById('sso-apple')?.addEventListener('click', () => {
 			if (emailInput && passwordInput) {
 				emailInput.value = 'client@credx.com';
-				passwordInput.value = 'ClientCredXPass123!';
+				passwordInput.value = 'CredXClientPass2026!';
 				form?.dispatchEvent(new Event('submit', { cancelable: true }));
 			}
 		});
