@@ -3,18 +3,17 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
+	output: 'server',
 	vite: {
 		server: {
 			proxy: {
 				'/api': {
-					target: 'https://credx-auwn.onrender.com',
+					target: 'http://localhost:8000',
 					changeOrigin: true,
-					secure: true,
 				},
 				'/health': {
-					target: 'https://credx-auwn.onrender.com',
+					target: 'http://localhost:8000',
 					changeOrigin: true,
-					secure: true,
 				},
 			},
 		},

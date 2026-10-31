@@ -47,7 +47,7 @@ def explain_assessment(
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
-            max_tokens=500,
+            max_tokens=1024,
         )
         explanation = response.choices[0].message.content.strip()
         return {
@@ -69,16 +69,15 @@ def _build_prompt(
     rule_scores: dict,
     top_indicators: list[str],
 ) -> str:
-    indicators_text = "\n".join(f"- {ind}" for ind in top_indicators) if top_indicators else "- None"
-    scores_text = "\n".join(f"- {k}: {v:.1f}/100" for k, v in rule_scores.items())
+    top_score_name = max(rule_scores, key=rule_scores.get, default="unknown") if rule_scores else "unknown"
+    top_score_val = rule_scores.get(top_score_name, 0)
+    indicators_brief = "; ".join(top_indicators[:3]) if top_indicators else "None"
 
     return (
-        f"Explain the following Early Warning System assessment for customer {customer_id}:\n\n"
-        f"Warning Score: {warning_score:.1f}/100 (Risk Category: {risk_category})\n\n"
-        f"Rule Scores:\n{scores_text}\n\n"
-        f"Active Warning Indicators:\n{indicators_text}\n\n"
-        "Provide a clear explanation of why this customer's risk level is what it is, "
-        "which factors are the primary drivers, and what actions might be appropriate."
+        f"Customer {customer_id}: score {warning_score:.0f}/100 ({risk_category}). "
+        f"Top driver: {top_score_name.replace('_', ' ')} at {top_score_val:.0f}/100. "
+        f"Signals: {indicators_brief}. "
+        f"Explain the risk and recommend actions in 3-4 sentences."
     )
 
 

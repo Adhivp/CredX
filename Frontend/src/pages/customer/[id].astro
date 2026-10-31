@@ -1,0 +1,256 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+
+const { id } = Astro.params;
+---
+
+<Layout title={`CredX — Customer ${id}`}>
+  <div class="dash-layout">
+    <DashboardNav />
+    <main class="dash-main">
+      <div class="dash-header">
+        <h1>Customer <span id="custTitle">{id}</span></h1>
+        <a href="/watchlist" class="btn btn-ghost">← Back to Watchlist</a>
+      </div>
+      <div id="customerContent">
+        <div class="loading">Loading customer data…</div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script define:vars={{ id }}>
+  const API = '/api/v1/ews';
+  const customerId = id;
+
+  async function loadCustomer() {
+    const container = document.getElementById('customerContent');
+    try {
+      const res = await fetch(`${API}/customer/${customerId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderCustomer(data, container);
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state">Error loading customer: ${err.message}</div>`;
+    }
+  }
+
+  function gaugeColor(score) {
+    if (score < 20) return '#22C55E';
+    if (score < 45) return '#F59E0B';
+    if (score < 70) return '#F97316';
+    return '#EF4444';
+  }
+
+  function renderCustomer(data, container) {
+    const c = data.customer || {};
+    const assessments = data.assessments || [];
+    const latest = assessments.length > 0 ? assessments[assessments.length - 1] : null;
+    const score = latest ? latest.warning_score : 0;
+    const category = latest ? latest.risk_category : 'N/A';
+    const color = gaugeColor(score);
+    const deg = (score / 100) * 360;
+
+    const loans = data.loans || [];
+    const repayments = data.repayments || [];
+    const alerts = data.alerts || [];
+
+    const indicators = latest ? (typeof latest.top_indicators === 'string' ? JSON.parse(latest.top_indicators) : latest.top_indicators) || [] : [];
+
+    // Profile + Score
+    const profileHtml = `
+      <div class="detail-grid">
+        <div class="profile-card">
+          <div class="score-gauge" style="background:conic-gradient(${color} ${deg}deg, var(--border-subtle) ${deg}deg)">
+            <div class="score-gauge-inner">
+              <div class="score-gauge-value" style="color:${color}">${score.toFixed(0)}</div>
+              <div class="score-gauge-label">Warning Score</div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-bottom:1rem;">
+            <span class="badge badge-${category.toLowerCase()}" style="font-size:0.8rem;">${category}</span>
+          </div>
+          <dl>
+            <div class="profile-card-field"><dt>Customer ID</dt><dd>${c.customer_id || customerId}</dd></div>
+            <div class="profile-card-field"><dt>Type</dt><dd>${c.customer_type || '—'}</dd></div>
+            <div class="profile-card-field"><dt>Employment</dt><dd>${c.employment_category || '—'}</dd></div>
+            <div class="profile-card-field"><dt>Segment</dt><dd>${c.portfolio_segment || '—'}</dd></div>
+          </dl>
+        </div>
+        <div>
+          <!-- Indicators -->
+          <div class="data-table-wrap" style="margin-bottom:1rem;">
+            <h3>Warning Indicators</h3>
+            <div style="padding:1rem;">
+              ${indicators.length > 0 ? `<ul class="ai-factors">${indicators.map(i => `<li>${i}</li>`).join('')}</ul>` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No active warning indicators</div>'}
+            </div>
+          </div>
+
+          <!-- Rule Scores -->
+          ${latest ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1rem;">
+            <div class="stat-card"><div class="stat-card-label">Delay Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_delay_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Miss Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_miss_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Exposure Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_exposure_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Data Quality</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_completeness_score||0).toFixed(0)}</div></div>
+          </div>` : ''}
+        </div>
+      </div>`;
+
+    // AI Explanation
+    const aiHtml = `
+      <div class="ai-section">
+        <h3>✦ AI Risk Explanation</h3>
+        <div id="aiExplanation" style="color:var(--text-muted);font-size:0.8125rem;">Click below to generate an AI-powered explanation of this customer's risk.</div>
+        <button id="explainBtn" class="btn btn-primary" style="margin-top:0.75rem;">🤖 Get AI Explanation</button>
+      </div>`;
+
+    // Alert Classification
+    const assessmentId = latest ? latest.id : null;
+    const alertHtml = `
+      <div class="alert-panel">
+        <h3>Classify Alert</h3>
+        <div class="alert-buttons">
+          <button class="alert-btn" data-decision="Continue Monitoring">Continue Monitoring</button>
+          <button class="alert-btn" data-decision="Requires Investigation">Requires Investigation</button>
+          <button class="alert-btn" data-decision="False Positive">False Positive</button>
+          <button class="alert-btn" data-decision="Escalate for Review">Escalate for Review</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reason</label>
+          <textarea id="alertReason" class="form-textarea" placeholder="Provide a reason for the classification…"></textarea>
+        </div>
+        <button id="submitAlert" class="btn btn-primary" disabled>Submit Classification</button>
+        <input type="hidden" id="assessmentId" value="${assessmentId || ''}" />
+      </div>`;
+
+    // Loans table
+    const loansHtml = loans.length > 0 ? `
+      <div class="data-table-wrap">
+        <h3>Loan Facilities (${loans.length})</h3>
+        <table class="data-table">
+          <thead><tr><th>Loan ID</th><th>Product</th><th>Sanctioned</th><th>Outstanding</th><th>Instalment</th><th>Tenure</th></tr></thead>
+          <tbody>${loans.map(l => `<tr>
+            <td class="mono">${l.loan_id}</td>
+            <td>${l.product_type || '—'}</td>
+            <td class="mono">₹${(l.sanctioned_amount||0).toLocaleString()}</td>
+            <td class="mono">₹${(l.outstanding_balance||0).toLocaleString()}</td>
+            <td class="mono">₹${(l.instalment_amount||0).toLocaleString()}</td>
+            <td>${l.tenure_months || '—'} mo</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '';
+
+    // Repayments table
+    const repHtml = repayments.length > 0 ? `
+      <div class="data-table-wrap">
+        <h3>Repayment History (${repayments.length})</h3>
+        <table class="data-table">
+          <thead><tr><th>Due Date</th><th>Payment Date</th><th>Due</th><th>Paid</th><th>DPD</th><th>Status</th></tr></thead>
+          <tbody>${repayments.map(r => {
+            const status = r.repayment_status || 'unknown';
+            return `<tr>
+              <td class="mono">${r.due_date || '—'}</td>
+              <td class="mono">${r.payment_date || '—'}</td>
+              <td class="mono">₹${(r.amount_due||0).toLocaleString()}</td>
+              <td class="mono">₹${(r.amount_paid||0).toLocaleString()}</td>
+              <td class="mono">${r.dpd || 0}</td>
+              <td><span class="status-${status}">${status}</span></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>` : '';
+
+    // Past alerts
+    const alertsHistHtml = alerts.length > 0 ? `
+      <div class="data-table-wrap">
+        <h3>Past Alert Decisions (${alerts.length})</h3>
+        <table class="data-table">
+          <thead><tr><th>Decision</th><th>Reason</th><th>Original Score</th><th>Analyst</th><th>Date</th></tr></thead>
+          <tbody>${alerts.map(a => `<tr>
+            <td><span class="badge badge-medium">${a.decision}</span></td>
+            <td>${a.reason || '—'}</td>
+            <td class="mono">${a.original_score?.toFixed(1) || '—'}</td>
+            <td>${a.analyst_id || '—'}</td>
+            <td class="mono">${a.created_at ? new Date(a.created_at * 1000).toLocaleDateString() : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '';
+
+    container.innerHTML = profileHtml + aiHtml + alertHtml + loansHtml + repHtml + alertsHistHtml;
+
+    // Wire up AI explanation
+    document.getElementById('explainBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('explainBtn');
+      const out = document.getElementById('aiExplanation');
+      btn.disabled = true;
+      btn.textContent = '⏳ Generating…';
+      out.textContent = 'Calling AI model…';
+
+      try {
+        const res = await fetch(`${API}/explain/${customerId}`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+
+        let html = `<p class="ai-explanation">${result.explanation || 'No explanation generated.'}</p>`;
+        if (result.risk_factors && result.risk_factors.length) {
+          html += `<h4 style="margin-top:0.75rem;font-size:0.75rem;color:var(--gold-500);text-transform:uppercase;letter-spacing:0.05em;">Risk Factors</h4>`;
+          html += `<ul class="ai-factors">${result.risk_factors.map(f => `<li>${f}</li>`).join('')}</ul>`;
+        }
+        if (result.recommended_actions && result.recommended_actions.length) {
+          html += `<h4 style="margin-top:0.75rem;font-size:0.75rem;color:var(--gold-500);text-transform:uppercase;letter-spacing:0.05em;">Recommended Actions</h4>`;
+          html += `<ul class="ai-factors">${result.recommended_actions.map(a => `<li>${a}</li>`).join('')}</ul>`;
+        }
+        out.innerHTML = html;
+      } catch (err) {
+        out.textContent = `Error: ${err.message}`;
+      }
+      btn.disabled = false;
+      btn.textContent = '🤖 Get AI Explanation';
+    });
+
+    // Wire up alert classification
+    let selectedDecision = null;
+    document.querySelectorAll('.alert-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.alert-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedDecision = btn.dataset.decision;
+        document.getElementById('submitAlert').disabled = false;
+      });
+    });
+
+    document.getElementById('submitAlert').addEventListener('click', async () => {
+      const aId = document.getElementById('assessmentId').value;
+      const reason = document.getElementById('alertReason').value;
+      if (!aId || !selectedDecision) return;
+
+      const submitBtn = document.getElementById('submitAlert');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Submitting…';
+
+      try {
+        const res = await fetch(`${API}/alert/${aId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision: selectedDecision, reason, analyst_id: 'analyst-1' }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        submitBtn.textContent = '✓ Submitted';
+        setTimeout(() => loadCustomer(), 1000);
+      } catch (err) {
+        submitBtn.textContent = `✗ ${err.message}`;
+      }
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Classification';
+      }, 3000);
+    });
+  }
+
+  loadCustomer();
+</script>
