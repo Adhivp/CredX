@@ -80,7 +80,9 @@ Create repository Actions secrets (not variables):
 - `JWT_SECRET`: stable cryptographically random value, minimum 48 characters.
   Do not regenerate it for each deployment; rotation invalidates existing JWTs.
 
-Create these repository Actions variables exactly:
+The workflow defaults missing or empty target variables to the existing India
+Development project below. These IDs and region are public configuration, not
+secrets. You may also set repository Actions variables explicitly:
 
 ```sh
 gh variable set CATALYST_PROJECT_ID --repo Adhivp/CredX --body 54564000000101001
@@ -88,6 +90,17 @@ gh variable set CATALYST_ORG_ID --repo Adhivp/CredX --body 60077360744
 gh variable set CATALYST_ENVIRONMENT --repo Adhivp/CredX --body Development
 gh variable set CATALYST_DC --repo Adhivp/CredX --body in
 ```
+
+If preflight reports `Refusing deployment: incorrect CATALYST_PROJECT_ID` (or
+another target key), inspect **Settings > Secrets and variables > Actions >
+Variables**, not the Secrets tab. An unset `vars.KEY` expands to an empty string;
+the workflow now supplies the fixed Development default in that case. A nonempty
+incorrect value is still rejected: correct it to the exact value above, with no
+quotes or whitespace. Do not remove the target guard or use a Production value.
+Environment-scoped variables are not available unless the job selects that GitHub
+environment; use repository variables here. `CATALYST_TOKEN` and `JWT_SECRET`
+remain required secrets and have no defaults. After a workflow change reaches
+`main`, start a new manual run; rerunning an old failed run uses its old revision.
 
 CLI authentication procedure (in a trusted terminal, never in CI logs/chat):
 

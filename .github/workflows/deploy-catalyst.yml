@@ -85,10 +85,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      CATALYST_PROJECT_ID: ${{ vars.CATALYST_PROJECT_ID }}
-      CATALYST_ORG_ID: ${{ vars.CATALYST_ORG_ID }}
-      CATALYST_ENVIRONMENT: ${{ vars.CATALYST_ENVIRONMENT }}
-      CATALYST_DC: ${{ vars.CATALYST_DC }}
+      # Public, fixed Development target; absent repository variables are safe.
+      # Nonempty incorrect overrides still fail validateTarget before CLI calls.
+      CATALYST_PROJECT_ID: ${{ vars.CATALYST_PROJECT_ID || '54564000000101001' }}
+      CATALYST_ORG_ID: ${{ vars.CATALYST_ORG_ID || '60077360744' }}
+      CATALYST_ENVIRONMENT: ${{ vars.CATALYST_ENVIRONMENT || 'Development' }}
+      CATALYST_DC: ${{ vars.CATALYST_DC || 'in' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

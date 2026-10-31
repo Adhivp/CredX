@@ -3,6 +3,30 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('workflow defaults missing target variables without accepting incorrect overrides', () => {
+  const { validateTarget } = require('./catalyst.cjs');
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/deploy-catalyst.yml'), 'utf8');
+  // Evaluate only the workflow's simple vars.KEY || 'literal' expressions, never code.
+  const entries = [...workflow.matchAll(/^      (CATALYST_\w+): \$\{\{ vars\.\1(?: \|\| '([^']+)')? \}\}$/gm)];
+  assert.equal(entries.length, 4);
+  const resolve = (vars) => Object.fromEntries(entries.map(([, key, fallback]) =>
+    [key, vars[key] || fallback || '']));
+  const expected = {
+    CATALYST_PROJECT_ID: '54564000000101001', CATALYST_ORG_ID: '60077360744',
+    CATALYST_ENVIRONMENT: 'Development', CATALYST_DC: 'in',
+  };
+  assert.doesNotThrow(() => validateTarget(resolve({})));
+  assert.deepEqual(resolve({}), expected);
+  assert.deepEqual(resolve(expected), expected);
+  for (const key of Object.keys(expected)) {
+    assert.doesNotThrow(() => validateTarget(resolve({ [key]: '' })));
+    assert.doesNotThrow(() => validateTarget(resolve({ [key]: expected[key] })));
+    for (const value of ['incorrect', 'Production', ` ${expected[key]}`, `${expected[key]}\n`]) {
+      assert.throws(() => validateTarget(resolve({ [key]: value })), new RegExp(key));
+    }
+  }
+});
+
 test('configuration waits for asynchronous Docker creation to finish', () => {
   const { deploymentReady } = require('./catalyst.cjs');
   assert.equal(typeof deploymentReady, 'function');
