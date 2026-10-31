@@ -12,10 +12,6 @@ import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.a
       <div class="dash-header">
         <div class="header-titles">
           <div class="header-badge-row">
-            <span class="system-pill">
-              <span class="pulse-dot-emerald"></span>
-              Live Portfolio Surveillance
-            </span>
             <span class="header-date" id="watchlist-clock"></span>
           </div>
           <h1 class="dash-title">Risk Surveillance <span class="gold-gradient-text">Watchlist</span></h1>
@@ -494,6 +490,25 @@ import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.a
     // Apply & Reset buttons
     applyBtn?.addEventListener('click', loadWatchlist);
     resetBtn?.addEventListener('click', resetFilters);
+
+    // Live system timestamp
+    function updateClock() {
+      const clock = document.getElementById('watchlist-clock');
+      if (clock) {
+        const now = new Date();
+        clock.textContent = now.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }).toUpperCase();
+      }
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
 
     loadWatchlist();
   });
