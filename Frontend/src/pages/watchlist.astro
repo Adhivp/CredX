@@ -1,0 +1,107 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+---
+
+<Layout title="CredX — Watchlist">
+  <div class="dash-layout">
+    <DashboardNav active="watchlist" />
+    <main class="dash-main">
+      <div class="dash-header">
+        <h1>Risk <span>Watchlist</span></h1>
+      </div>
+
+      <div class="filter-bar">
+        <div class="form-group">
+          <label class="form-label">Risk Category</label>
+          <select id="filterRisk" class="form-select" style="width:160px">
+            <option value="">All</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Min Score: <span id="scoreLabel">0</span></label>
+          <input type="range" id="filterScore" min="0" max="100" value="0" style="width:200px;accent-color:var(--gold-500);" />
+        </div>
+        <button id="applyFilter" class="btn btn-secondary">Apply Filters</button>
+      </div>
+
+      <div id="watchlistContent">
+        <div class="loading">Loading watchlist…</div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  const API = '/api/v1/ews';
+  const scoreSlider = document.getElementById('filterScore');
+  const scoreLabel = document.getElementById('scoreLabel');
+
+  scoreSlider.addEventListener('input', () => { scoreLabel.textContent = scoreSlider.value; });
+
+  async function loadWatchlist() {
+    const container = document.getElementById('watchlistContent');
+    const risk = document.getElementById('filterRisk').value;
+    const minScore = document.getElementById('filterScore').value;
+
+    let url = `${API}/watchlist?min_score=${minScore}&limit=100`;
+    if (risk) url += `&risk_category=${risk}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderWatchlist(data, container);
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+    }
+  }
+
+  function renderWatchlist(data, container) {
+    if (!data.items || data.items.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>No customers match the current filters.<br><small>Try adjusting filters or run an assessment first.</small></div>`;
+      return;
+    }
+
+    const rows = data.items.map(item => {
+      const badgeCls = `badge-${item.risk_category.toLowerCase()}`;
+      const indicators = (item.top_indicators || []).slice(0, 2).join('<br>');
+      const outstanding = item.outstanding_exposure ? `₹${(item.outstanding_exposure / 1000).toFixed(0)}K` : '—';
+      return `<tr class="clickable" onclick="window.location='/customer/${item.customer_id}'">
+        <td class="mono">${item.customer_id}</td>
+        <td>${item.product_type || '—'}</td>
+        <td class="mono">${outstanding}</td>
+        <td class="score-cell">${item.warning_score.toFixed(1)}</td>
+        <td><span class="badge ${badgeCls}">${item.risk_category}</span></td>
+        <td style="font-size:0.75rem;max-width:300px;">${indicators || '—'}</td>
+        <td><span class="badge ${item.monitoring_status === 'Active' ? 'badge-low' : 'badge-medium'}">${item.monitoring_status}</span></td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="data-table-wrap">
+        <h3>${data.total} customers on watchlist</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Product</th>
+              <th>Outstanding</th>
+              <th>Score</th>
+              <th>Risk</th>
+              <th>Key Indicators</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('applyFilter').addEventListener('click', loadWatchlist);
+  loadWatchlist();
+</script>

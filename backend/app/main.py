@@ -15,9 +15,10 @@ def create_app() -> FastAPI:
     settings = Settings()
     engine, session_factory = configure_database(settings.database_url)
 
-    import app.models.ews  # noqa: F401 — register ORM models before create_all
-    with engine.begin() as conn:
-        Base.metadata.create_all(conn, checkfirst=True)
+    import app.models.user  # noqa: F401
+    import app.models.auth_session  # noqa: F401
+    import app.models.ews  # noqa: F401
+    Base.metadata.create_all(bind=engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

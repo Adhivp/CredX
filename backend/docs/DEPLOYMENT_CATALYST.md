@@ -80,7 +80,9 @@ Create repository Actions secrets (not variables):
 - `JWT_SECRET`: stable cryptographically random value, minimum 48 characters.
   Do not regenerate it for each deployment; rotation invalidates existing JWTs.
 
-Create these repository Actions variables exactly:
+The workflow defaults missing or empty target variables to the existing India
+Development project below. These IDs and region are public configuration, not
+secrets. You may also set repository Actions variables explicitly:
 
 ```sh
 gh variable set CATALYST_PROJECT_ID --repo Adhivp/CredX --body 54564000000101001
@@ -88,6 +90,17 @@ gh variable set CATALYST_ORG_ID --repo Adhivp/CredX --body 60077360744
 gh variable set CATALYST_ENVIRONMENT --repo Adhivp/CredX --body Development
 gh variable set CATALYST_DC --repo Adhivp/CredX --body in
 ```
+
+If preflight reports `Refusing deployment: incorrect CATALYST_PROJECT_ID` (or
+another target key), inspect **Settings > Secrets and variables > Actions >
+Variables**, not the Secrets tab. An unset `vars.KEY` expands to an empty string;
+the workflow now supplies the fixed Development default in that case. A nonempty
+incorrect value is still rejected: correct it to the exact value above, with no
+quotes or whitespace. Do not remove the target guard or use a Production value.
+Environment-scoped variables are not available unless the job selects that GitHub
+environment; use repository variables here. `CATALYST_TOKEN` and `JWT_SECRET`
+remain required secrets and have no defaults. After a workflow change reaches
+`main`, start a new manual run; rerunning an old failed run uses its old revision.
 
 CLI authentication procedure (in a trusted terminal, never in CI logs/chat):
 
@@ -134,8 +147,10 @@ secrets and **cannot deploy**. Manual runs on another branch only build/test.
 3. Load and exercise the actual image, including Alembic and HTTP endpoints.
 4. Pass the tested archive to the deployment job as a one-day GitHub artifact.
    No public registry or Docker registry credentials are needed.
-5. Validate all target variables and secrets, install the official CLI, associate
-   the existing project using `project:use`, and inspect remote service identity.
+5. Validate all target variables and secrets, install the official CLI, and inspect
+   the existing project/Development environment and service identity remotely.
+   Deployment selects the project explicitly through `--project` and `--org`; CI
+   does not run the local RC-mutating `project:use` command.
 6. `catalyst deploy appsail --name credx-api --source docker-archive://... --port 9000`
    upserts by name. It creates a missing service or updates the existing one;
    `appsail:add` only links local configuration, it is not a remote create command.
@@ -207,6 +222,21 @@ Read from `backend/app/core/config.py`; variable values are strings:
 If needed, configure `NEBIUS_API_KEY` in Catalyst's Development environment only,
 not in source. It is not required for startup or these health checks.
 
+### CLI 1.29.1 CI-mode project association
+
+`project:use` fails in GitHub Actions with `.catalystrc file needed to upsert
+project` even when the tracked file exists. The CLI
+`command_needs/rc.js` returns early in CI after setting project/org IDs, without
+loading an RC object; `project:use` then calls `upsertProject`, which requires one.
+Creating another RC file does not fix that control flow. Do not disable CI mode
+or create another project to work around it.
+
+The workflow instead verifies the existing remote Development environment using
+`node backend/scripts/catalyst.cjs inspect` and retains explicit `--project`,
+`--org`, and `--dc` options on the official CLI deploy command. The tracked
+`.catalystrc` remains available for local CLI use. Do not use `CI=false`: the CLI
+treats any nonempty CI value as true.
+
 ## Manual Development deployment and validation
 
 After building/exporting above, run from the repository root with a securely
@@ -219,7 +249,6 @@ export CATALYST_ENVIRONMENT=Development
 export CATALYST_DC=in
 export NODE_PATH="$(npm root --global)"
 
-catalyst project:use "$CATALYST_PROJECT_ID" --org "$CATALYST_ORG_ID" --dc in --non-interactive
 node backend/scripts/catalyst.cjs inspect
 catalyst deploy appsail --name credx-api \
   --source docker-archive://.catalyst-artifacts/credx-api.tar --port 9000 \
@@ -281,13 +310,12 @@ behavior is preserved, not endorsed as a production schema management strategy.
 - Existing main hardcodes wildcard CORS with credentials and ignores configured
   `CORS_ORIGINS`. EWS routes also require an independent authorization/security
   review. This deployment does not fix or rewrite that application logic.
-- The original test suite currently fails its API-doc equality, migration/model
-  comparison and unlisted-origin CORS tests, plus a garbage-collection-dependent
-  unclosed-SQLite-connection warning attributed to varying security test cases.
-  Baseline and current runs reproduced these same failure causes (34 passed / 4
-  failed on baseline, 37 passed / 4 failed with deployment tests); isolated security
-  tests passed. Preserve and resolve these in a separate application PR; do not
-  describe this as a green full-suite release.
+- The API schema/reference is now regenerated and its documentation tests pass.
+  The full application suite still has migration/model drift and unlisted-origin
+  CORS failures, plus a garbage-collection-dependent unclosed-SQLite-connection
+  warning attributed to varying security test cases. These application issues
+  remain separate from this CI/docs fix; do not describe this as a green full-suite
+  release.
 
 There is no automatic database rollback. Redeploying an older image is not a safe
 rollback for incompatible migrations or a substitute for restoring backups.
