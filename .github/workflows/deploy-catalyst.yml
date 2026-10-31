@@ -85,10 +85,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      CATALYST_PROJECT_ID: ${{ vars.CATALYST_PROJECT_ID }}
-      CATALYST_ORG_ID: ${{ vars.CATALYST_ORG_ID }}
-      CATALYST_ENVIRONMENT: ${{ vars.CATALYST_ENVIRONMENT }}
-      CATALYST_DC: ${{ vars.CATALYST_DC }}
+      # Public, fixed Development target; absent repository variables are safe.
+      # Nonempty incorrect overrides still fail validateTarget before CLI calls.
+      CATALYST_PROJECT_ID: ${{ vars.CATALYST_PROJECT_ID || '54564000000101001' }}
+      CATALYST_ORG_ID: ${{ vars.CATALYST_ORG_ID || '60077360744' }}
+      CATALYST_ENVIRONMENT: ${{ vars.CATALYST_ENVIRONMENT || 'Development' }}
+      CATALYST_DC: ${{ vars.CATALYST_DC || 'in' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -116,13 +118,12 @@ jobs:
           npm install --global zcatalyst-cli@1.29.1
           printf 'NODE_PATH=%s\n' "$(npm root --global)" >> "$GITHUB_ENV"
           catalyst --version
-      - name: Associate existing project and check service identity
+      - name: Verify existing Development project and service identity
         env:
           CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
-        run: |
-          catalyst project:use "$CATALYST_PROJECT_ID" \
-            --org "$CATALYST_ORG_ID" --dc "$CATALYST_DC" --non-interactive
-          node backend/scripts/catalyst.cjs inspect
+        # CLI 1.29.1 skips RC loading in CI: project:use cannot update its RC.
+        # Deploy selects the target with --project/--org; inspect verifies it remotely.
+        run: node backend/scripts/catalyst.cjs inspect
       - name: Create or update credx-api using CLI name-based upsert
         env:
           CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
