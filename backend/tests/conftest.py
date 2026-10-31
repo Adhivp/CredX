@@ -11,6 +11,7 @@ def client(tmp_path, monkeypatch):
     from app.main import create_app
 
     monkeypatch.setenv("JWT_SECRET", "test-only-secret-" * 4)
+    monkeypatch.setenv("CORS_ORIGINS", "[]")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     app = create_app()
     Base.metadata.create_all(app.state.engine)

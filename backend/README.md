@@ -1,6 +1,6 @@
 # CredX backend
 
-Modular FastAPI authentication starter for the CredX monorepo. Everything lives in `backend/`; no frontend or root-level project configuration is required. Python 3.11–3.13 is supported by the project metadata; this setup was exercised on Python 3.13.
+Modular FastAPI authentication starter for the CredX monorepo. Everything lives in `backend/`; no frontend or root-level project configuration is required. The backend targets Python 3.14 (`>=3.14,<3.15`); both uv and pip installations were exercised on CPython 3.14.9. `backend/.python-version` selects the 3.14 series for uv.
 
 This is a development foundation, **not a production banking system**. There are no account balances, transfers, KYC, or payment APIs.
 
@@ -26,15 +26,15 @@ Choose one environment for normal development; using both is not necessary. The 
 
 ```sh
 cd backend
-python3 -m venv .venv-pip
+python3.14 -m venv .venv-pip
 . .venv-pip/bin/activate
-python -m pip install --require-hashes -r requirements-dev.txt
+python -m pip install --only-binary=:all: --require-hashes -r requirements-dev.txt
 python scripts/init_env.py
 python -m alembic upgrade head
 python -m uvicorn app.main:create_app --factory --reload --host 127.0.0.1 --port 8000
 ```
 
-For runtime dependencies only, install `requirements.txt` instead of `requirements-dev.txt`. On Windows, use `py -3.13 -m venv .venv-pip` and `.venv-pip\Scripts\Activate.ps1`. These commands run from `backend/`, so the `app` package does not require an editable pip install.
+For runtime dependencies only, install `requirements.txt` instead of `requirements-dev.txt`. On Windows, use `py -3.14 -m venv .venv-pip` and `.venv-pip\Scripts\Activate.ps1`. These commands run from `backend/`, so the `app` package does not require an editable pip install.
 
 `pyproject.toml` is the dependency source of truth. `uv.lock` and the hash-pinned pip exports are checked-in reproducibility artifacts. Never edit generated requirements independently. After intentionally changing dependencies:
 
@@ -44,6 +44,39 @@ uv sync --locked
 uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file requirements.txt
 uv export --locked --all-groups --no-emit-project --format requirements-txt --output-file requirements-dev.txt
 ```
+
+## Render deployment (Python 3.14)
+
+Configure a Python web service with **Root Directory** set to `backend`.
+
+Environment variables:
+
+```text
+PYTHON_VERSION=3.14.9
+CORS_ORIGINS=[]
+```
+
+Keep `JWT_SECRET` as a stable, cryptographically random secret of at least 48 characters in Render's environment settings. Do not regenerate it on every start. In the dashboard, enter `[]` as the CORS value without outer single quotes; no frontend URL is required.
+
+Build command (pip):
+
+```sh
+python -m pip install --only-binary=:all: --require-hashes -r requirements.txt
+```
+
+Start command:
+
+```sh
+python -m alembic upgrade head && python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+```
+
+Health check path: `/health`.
+
+Alternatively, build with `uv sync --locked --no-dev` and prefix the start commands with `uv run --no-sync` instead of `python -m`. Choose one installation path, not both.
+
+After committing and pushing the Python upgrade, use Render's **Clear build cache & deploy** so an older virtual environment or requirements export is not reused. Confirm Python 3.14 in the build log. The regenerated requirements include Python 3.14 wheel hashes. The pip `--only-binary=:all:` option forbids source compilation: if no compatible wheel exists for a different platform, installation fails explicitly rather than trying Rust/Cargo in a read-only directory. All locked runtime and development packages installed as wheels on Linux x86-64 / CPython 3.14.9 during verification.
+
+Mount a Render persistent disk and set `DATABASE_URL` to a SQLite file under that mount (for example `sqlite:////var/data/credx.db` for a `/var/data` mount). Without persistent storage, redeployments can discard registered users and sessions. Creating a persistent disk or changing Render's remote settings is not performed by this repository upgrade.
 
 ## Layout
 
