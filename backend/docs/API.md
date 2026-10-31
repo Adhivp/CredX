@@ -726,3 +726,173 @@ Authorised approval of a customer-impacting intervention. Requires an access bea
 - Defaults: [`app/core/config.py`](../app/core/config.py).
 
 This API combines an authentication foundation with an unprotected EWS prototype. It is not production-ready banking security: EWS authorization, restrictive CORS, input hardening, and operational controls remain outside this documentation update.
+
+## Agent investigation platform
+
+Endpoints below require a bearer token **and** a role assigned by a risk administrator (new accounts are `unassigned` and receive 403). Every allowed and denied call is written to the append-only audit log. The `/api/v2/ews` routes are the role-checked, agent-backed counterparts of `/api/v1/ews`; the v1 routes keep their existing contract.
+
+<!-- Agent investigations -->
+
+### POST /api/v1/investigations
+
+Initiate
+
+### GET /api/v1/investigations
+
+List Investigations
+
+### GET /api/v1/investigations/{investigation_id}
+
+Get Workspace
+
+### GET /api/v1/investigations/{investigation_id}/events
+
+Events
+
+### POST /api/v1/investigations/{investigation_id}/notes
+
+Add Note
+
+### POST /api/v1/investigations/{investigation_id}/tasks
+
+Request Task
+
+### POST /api/v1/investigations/{investigation_id}/hypotheses/{hypothesis_id}/challenge
+
+Challenge
+
+### POST /api/v1/investigations/{investigation_id}/findings/{finding_id}/review
+
+Review Finding
+
+### POST /api/v1/investigations/{investigation_id}/challenges/{challenge_id}/resolve
+
+Resolve Challenge
+
+### POST /api/v1/investigations/{investigation_id}/records/{record_id}/review
+
+Review Record
+
+### POST /api/v1/investigations/{investigation_id}/validate-evidence
+
+Validate Evidence
+
+### POST /api/v1/investigations/{investigation_id}/evidence-requests
+
+Request Evidence
+
+### POST /api/v1/investigations/{investigation_id}/assign
+
+Assign
+
+### POST /api/v1/investigations/{investigation_id}/escalate
+
+Escalate
+
+### POST /api/v1/investigations/{investigation_id}/complete-review
+
+Complete Review
+
+### POST /api/v1/investigations/{investigation_id}/classification-decision
+
+Classification Decision
+
+### POST /api/v1/investigations/{investigation_id}/interventions/{intervention_id}/decision
+
+Intervention Decision
+
+### POST /api/v1/investigations/{investigation_id}/portfolio-decision
+
+Portfolio Decision
+
+### POST /api/v1/investigations/{investigation_id}/reopen
+
+Reopen
+
+### PUT /api/v1/investigations/{investigation_id}/monitoring
+
+Set Monitoring
+
+### POST /api/v1/investigations/{investigation_id}/monitoring/evaluate
+
+Evaluate Monitoring
+
+### POST /api/v1/investigations/{investigation_id}/cancel
+
+Cancel
+
+<!-- Review queue -->
+
+### GET /api/v1/reviews/queue
+
+Queue
+
+<!-- Administration -->
+
+### GET /api/v1/admin/users
+
+List Users
+
+### PUT /api/v1/admin/users/{user_id}/role
+
+Assign Role
+
+### POST /api/v1/admin/users/{user_id}/scopes
+
+Grant Scope
+
+### DELETE /api/v1/admin/users/{user_id}/scopes
+
+Revoke Scope
+
+### GET /api/v1/admin/policies
+
+List Policies
+
+### POST /api/v1/admin/policies
+
+Create Policy
+
+<!-- System, audit and portfolio intelligence -->
+
+### GET /api/v1/system/status
+
+Status
+
+### GET /api/v1/audit/logs
+
+Audit Logs
+
+### GET /api/v1/portfolio/intelligence
+
+Portfolio Intelligence
+
+<!-- Governed EWS (v2, role-checked) -->
+
+### POST /api/v2/ews/upload
+
+Upload Data
+
+### POST /api/v2/ews/assess
+
+Run Assessment
+
+### GET /api/v2/ews/watchlist
+
+Get Watchlist
+
+### GET /api/v2/ews/customer/{customer_id}
+
+Get Customer Detail
+
+### POST /api/v2/ews/alert/{assessment_id}
+
+Classify Alert
+
+### POST /api/v2/ews/explain/{customer_id}
+
+Explain Customer
+
+### GET /api/v2/ews/portfolio
+
+Portfolio Summary

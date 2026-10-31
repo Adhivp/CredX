@@ -1,0 +1,353 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../../components/dashboard/OfficerProfileHeader.astro";
+const { id } = Astro.params;
+---
+
+<Layout title="CredX — Investigation">
+  <div class="dash-layout">
+    <DashboardNav active="investigations" />
+    <main class="dash-main" id="inv-root" data-id={id}>
+      <header class="dash-header">
+        <div class="header-titles">
+          <a href="/investigations" class="cx-muted" style="text-decoration:none">← All investigations</a>
+          <h1 class="dash-title" id="inv-title">Investigation</h1>
+          <p class="dash-subtitle" id="inv-sub">Loading…</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <div class="cx-row" id="inv-actions"></div>
+      <div class="cx-grid c4 cx-section" id="inv-kpis"></div>
+
+      <nav class="cx-tabs" id="tabs">
+        <button class="cx-tab active" data-tab="overview">Overview</button>
+        <button class="cx-tab" data-tab="hypotheses">Hypotheses</button>
+        <button class="cx-tab" data-tab="findings">Findings &amp; evidence</button>
+        <button class="cx-tab" data-tab="challenges">Challenges</button>
+        <button class="cx-tab" data-tab="adjudication">Adjudication &amp; decisions</button>
+        <button class="cx-tab" data-tab="notes">Notes</button>
+        <button class="cx-tab" data-tab="monitoring">Monitoring</button>
+        <button class="cx-tab" data-tab="activity">Activity</button>
+      </nav>
+      <section class="cx-pane" data-pane="overview" id="p-overview"></section>
+      <section class="cx-pane" data-pane="hypotheses" id="p-hypotheses" hidden></section>
+      <section class="cx-pane" data-pane="findings" id="p-findings" hidden></section>
+      <section class="cx-pane" data-pane="challenges" id="p-challenges" hidden></section>
+      <section class="cx-pane" data-pane="adjudication" id="p-adjudication" hidden></section>
+      <section class="cx-pane" data-pane="notes" id="p-notes" hidden></section>
+      <section class="cx-pane" data-pane="monitoring" id="p-monitoring" hidden></section>
+      <section class="cx-pane" data-pane="activity" id="p-activity" hidden></section>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import {
+    apiGet, apiPost, apiPut, esc, label, fmtTime, fmtMoney, fmtPct, statusPill, pill, agentName, requester,
+    CLASSIFICATION_TONE, SEVERITY_TONE, openForm, toast, me, can, ROLE_LABEL,
+  } from '../../lib/credx';
+
+  const root = document.getElementById('inv-root')!;
+  const ID = root.dataset.id!;
+  const BASE = `/api/v1/investigations/${ID}`;
+  const SPECIALISTS = ['repayment_specialist', 'cashflow_specialist', 'exposure_specialist', 'baseline_specialist', 'integrity_specialist', 'portfolio_specialist'];
+  const CLASSES = ['low_risk', 'emerging_deterioration', 'sustained_deterioration', 'accelerating_deterioration', 'recovery', 'insufficient_evidence'];
+  const opt = (vals: string[], blank?: string) => [...(blank !== undefined ? [{ value: '', text: blank }] : []), ...vals.map((v) => ({ value: v, text: label(v) }))];
+  const REASON = { name: 'reason', label: 'Reason (recorded in the audit trail)', type: 'textarea' as const, required: true, minLength: 5 };
+
+  let role = 'unassigned';
+  let ws: any = null;
+  let pollTimer: number | undefined;
+
+  const set = (id: string, html: string) => { document.getElementById(id)!.innerHTML = html; };
+  const empty = (msg: string) => `<div class="cx-card cx-empty">${esc(msg)}</div>`;
+  const cls = (c?: string | null, sev?: string | null) =>
+    c ? `${pill(label(c), CLASSIFICATION_TONE[c] || 'neutral')} ${sev ? pill(label(sev), SEVERITY_TONE[sev] || 'neutral') : ''}` : '<span class="cx-muted">—</span>';
+
+  /** Run an action through a form, then refresh. */
+  function act(title: string, path: string, fields: any[], build: (v: Record<string, string>) => any, opts: { method?: 'POST' | 'PUT'; description?: string; submit?: string } = {}) {
+    openForm({
+      title, description: opts.description, fields, submit: opts.submit || 'Submit',
+      onSubmit: async (v) => {
+        const body = build(v);
+        ws = opts.method === 'PUT' ? await apiPut(`${BASE}${path}`, body) : await apiPost(`${BASE}${path}`, body);
+        toast(`${title}: done`);
+        render();
+        schedulePoll();
+      },
+    });
+  }
+
+  function btn(label_: string, onClick: string, kind = 'btn-glass') {
+    return `<button type="button" class="btn ${kind} cx-btn-sm" data-act="${esc(onClick)}">${esc(label_)}</button>`;
+  }
+
+  // ── Header actions ───────────────────────────────────────────────────
+  const ACTIONS: Record<string, () => void> = {
+    note: () => act('Add note', '/notes', [
+      { name: 'kind', label: 'Kind', type: 'select', options: opt(['observation', 'context', 'document', 'correction']) },
+      { name: 'content', label: 'Note', type: 'textarea', required: true },
+      { name: 'category', label: 'Context category', type: 'select', options: opt(['temporary_disruption', 'seasonal_business', 'income_change', 'dispute_or_error', 'new_obligation', 'other'], '—') },
+      { name: 'document_name', label: 'Document name (for a document note)' },
+    ], (v) => ({ kind: v.kind, content: v.content, ...(v.category ? { category: v.category } : {}), ...(v.document_name ? { document_name: v.document_name } : {}) })),
+    task: () => act('Ask a specialist', '/tasks', [
+      { name: 'specialist', label: 'Specialist', type: 'select', options: opt(SPECIALISTS) },
+      { name: 'question', label: 'Question', type: 'textarea' },
+      { name: 'hypothesis_code', label: 'Hypothesis code (optional)', type: 'select', options: [{ value: '', text: '—' }, ...(ws?.hypotheses || []).map((h: any) => ({ value: h.code, text: `${h.code} — ${h.statement.slice(0, 60)}` }))] },
+    ], (v) => ({ specialist: v.specialist, question: v.question || '', ...(v.hypothesis_code ? { hypothesis_code: v.hypothesis_code } : {}) }), { description: 'Starts a new agent task; the investigation resumes running.' }),
+    validate: () => act('Validate evidence', '/validate-evidence', [
+      { name: 'outcome', label: 'Outcome', type: 'select', options: opt(['complete', 'incomplete']) },
+      { name: 'reason', label: 'Reason', type: 'textarea' },
+      { name: 'flagged', label: 'Flag findings (comma-separated finding IDs, optional)' },
+    ], (v) => ({ outcome: v.outcome, reason: v.reason || '', flagged_finding_ids: (v.flagged || '').split(',').map((s) => s.trim()).filter(Boolean) })),
+    evidence: () => act('Request more evidence', '/evidence-requests', [
+      { name: 'description', label: 'What evidence is needed?', type: 'textarea', required: true, minLength: 5 },
+    ], (v) => ({ description: v.description })),
+    assign: async () => {
+      let users: any[] = [];
+      try { users = (await apiGet('/api/v1/admin/users')).items || []; } catch { /* admin list needs the administrator role */ }
+      const analystField = users.length
+        ? { name: 'analyst_user_id', label: 'Analyst', type: 'select', options: users.filter((u) => ['credit_analyst', 'credit_manager'].includes(u.role)).map((u) => ({ value: u.id, text: `${u.full_name} · ${ROLE_LABEL[u.role] || u.role}` })) }
+        : { name: 'analyst_user_id', label: 'Analyst user ID', required: true };
+      act('Assign analyst', '/assign', [analystField, { ...REASON, required: false, minLength: undefined }], (v) => ({ analyst_user_id: v.analyst_user_id, reason: v.reason || '' }));
+    },
+    escalate: () => act('Escalate', '/escalate', [REASON], (v) => ({ reason: v.reason })),
+    complete: () => act('Complete analyst review', '/complete-review', [
+      REASON,
+      { name: 'recommended_classification', label: 'Recommended classification (optional)', type: 'select', options: opt(CLASSES, '—') },
+    ], (v) => ({ reason: v.reason, ...(v.recommended_classification ? { recommended_classification: v.recommended_classification } : {}) }), { description: 'Hands the investigation on for adjudication and approval.' }),
+    classify: () => act('Classification decision', '/classification-decision', [
+      { name: 'action', label: 'Decision', type: 'select', options: opt(['accept_classification', 'override_classification']) },
+      REASON,
+      { name: 'classification', label: 'Override classification', type: 'select', options: opt(CLASSES, '—') },
+      { name: 'severity', label: 'Override severity', type: 'select', options: opt(['low', 'moderate', 'high', 'severe'], '—') },
+    ], (v) => ({ action: v.action, reason: v.reason, ...(v.classification ? { classification: v.classification } : {}), ...(v.severity ? { severity: v.severity } : {}) })),
+    portfolio: () => act('Portfolio decision', '/portfolio-decision', [
+      { name: 'action', label: 'Decision', type: 'select', options: opt(['accept_portfolio_assessment', 'override_portfolio_assessment']) },
+      REASON,
+      { name: 'classification', label: 'Override classification (optional)', placeholder: 'e.g. portfolio_cluster' },
+    ], (v) => ({ action: v.action, reason: v.reason, ...(v.classification ? { classification: v.classification } : {}) })),
+    reopen: () => act('Reopen', '/reopen', [REASON], (v) => ({ reason: v.reason })),
+    cancel: () => act('Cancel investigation', '/cancel', [REASON], (v) => ({ reason: v.reason })),
+    monitor: () => act('Set monitoring instructions', '/monitoring', [
+      { name: 'reopen_score_delta', label: 'Reopen if score rises by (points)', placeholder: 'e.g. 10' },
+      { name: 'reopen_if_dpd_over', label: 'Reopen if DPD exceeds (days)', placeholder: 'e.g. 30' },
+      { name: 'review_frequency_days', label: 'Review every (days)', placeholder: 'e.g. 30' },
+      { name: 'note', label: 'Note', type: 'textarea' },
+      { name: 'reason', label: 'Reason', type: 'textarea' },
+    ], (v) => {
+      const n = (s: string) => (s.trim() === '' ? undefined : Number(s));
+      return { reopen_score_delta: n(v.reopen_score_delta), reopen_if_dpd_over: n(v.reopen_if_dpd_over), review_frequency_days: n(v.review_frequency_days), note: v.note || '', reason: v.reason || '' };
+    }, { method: 'PUT' }),
+    evaluate: async () => {
+      try { await apiPost(`${BASE}/monitoring/evaluate`); toast('Monitoring rules evaluated'); await refresh(); }
+      catch (e: any) { toast(e.message, 'critical'); }
+    },
+  };
+
+  function headerActions() {
+    const s = ws.status;
+    const list: [string, string, string?][] = [];
+    if (can(role, 'context') || can(role, 'request')) list.push(['Add note', 'note']);
+    if (can(role, 'request')) list.push(['Ask a specialist', 'task']);
+    if (can(role, 'evidence')) list.push(['Validate evidence', 'validate'], ['Request evidence', 'evidence']);
+    if (can(role, 'assign')) list.push(['Assign', 'assign']);
+    if (can(role, 'escalate')) list.push(['Escalate', 'escalate']);
+    if (can(role, 'complete') && s === 'awaiting_analyst_review') list.push(['Complete review', 'complete', 'btn-gold']);
+    if (can(role, 'approve') && s === 'awaiting_approval') list.push(['Classification decision', 'classify', 'btn-gold']);
+    if (can(role, 'portfolio') && ws.scope === 'portfolio') list.push(['Portfolio decision', 'portfolio', 'btn-gold']);
+    if (can(role, 'monitor')) list.push(['Monitoring rules', 'monitor']);
+    if (can(role, 'reopen')) list.push(['Reopen', 'reopen']);
+    if (can(role, 'cancel') && !['cancelled', 'approved', 'rejected'].includes(s)) list.push(['Cancel', 'cancel', 'btn-glass cx-btn-danger']);
+    if (!list.length) return `<span class="cx-muted">${esc(ROLE_LABEL[role] || role)}: view only. Actions depend on your role.</span>`;
+    return list.map(([t, a, k]) => btn(t, a, k)).join('');
+  }
+
+  // ── Panes ────────────────────────────────────────────────────────────
+  function overview() {
+    const c = ws.customer;
+    const adj = (ws.adjudications || []).at(-1);
+    const usage = ws.llm_usage || [];
+    const tokens = usage.reduce((a: number, u: any) => a + (u.prompt_tokens || 0) + (u.completion_tokens || 0), 0);
+    const cost = usage.reduce((a: number, u: any) => a + (u.cost_usd || 0), 0);
+    return `<div class="cx-grid c2">
+      <div class="cx-card"><div class="cx-eyebrow">Question</div><p style="margin:0">${esc(ws.question || 'General deterioration assessment')}</p>
+        <div class="cx-eyebrow" style="margin-top:1rem">Policy</div><p class="cx-muted" style="margin:0">${ws.policy ? `Version ${esc(ws.policy.version)}` : '—'}</p>
+        <div class="cx-eyebrow" style="margin-top:1rem">AI usage</div><p class="cx-muted" style="margin:0">${usage.length ? `${usage.reduce((a: number, u: any) => a + (u.calls || 0), 0)} calls · ${tokens.toLocaleString()} tokens · $${cost.toFixed(4)}` : 'No LLM calls (deterministic)'}</p></div>
+      <div class="cx-card"><div class="cx-eyebrow">Customer</div>${c ? `
+        <div class="cx-item-title"><a href="/customer/${esc(c.customer_id)}">${esc(c.customer_id)}</a> · ${esc(label(c.customer_type))}</div>
+        <p class="cx-muted">${esc(c.segment || '')} ${c.employment_category ? '· ' + esc(c.employment_category) : ''}</p>
+        <table class="cx-table" style="margin-top:.6rem"><thead><tr><th>Facility</th><th>Product</th><th>Outstanding</th><th>Status</th></tr></thead><tbody>
+        ${(c.facilities || []).map((f: any) => `<tr><td>${esc(f.loan_id)}</td><td>${esc(f.product_type)}</td><td>${fmtMoney(f.outstanding_balance)}</td><td>${esc(f.status)}</td></tr>`).join('')}</tbody></table>`
+        : `<p class="cx-muted">Portfolio investigation${ws.segment ? ` · ${esc(ws.segment)}` : ''}</p>`}</div>
+    </div>
+    ${adj ? `<div class="cx-card cx-section"><div class="cx-row between"><h3>Latest adjudication</h3>${cls(adj.classification, adj.severity)}</div>
+      <p style="margin:.25rem 0 .5rem">${esc(label(adj.recommendation || ""))}</p><p class="cx-muted" style="margin:0">${esc(adj.rationale || '')}</p></div>` : ''}
+    <div class="cx-card cx-section"><h3>Agent tasks</h3>${(ws.tasks || []).length ? `<table class="cx-table"><thead><tr><th>Agent</th><th>Question</th><th>Requested by</th><th>Round</th><th>Status</th></tr></thead><tbody>
+      ${ws.tasks.map((t: any) => `<tr><td>${esc(agentName(t.agent))}</td><td>${esc(t.question || '—')}${t.error ? `<div class="cx-error">${esc(t.error)}</div>` : ''}</td><td>${esc(requester(t.requested_by || ''))}</td><td>${esc(t.round)}</td><td>${statusPill(t.status)}</td></tr>`).join('')}</tbody></table>` : '<div class="cx-empty">No tasks yet.</div>'}</div>`;
+  }
+
+  function hypotheses() {
+    const hs = ws.hypotheses || [];
+    if (!hs.length) return empty('No hypotheses yet. The director forms them once the investigation starts.');
+    return `<div class="cx-stack">${hs.map((h: any) => `<div class="cx-item">
+      <div class="cx-row between"><div class="cx-item-title">${esc(h.code)} · ${esc(h.statement)}</div>
+        <div class="cx-row">${pill(label(h.status), h.status === 'supported' ? 'serious' : h.status === 'refuted' ? 'good' : 'info')} ${pill(`P${esc(h.priority)}`, 'neutral')}
+        ${can(role, 'context') ? btn('Challenge', `challenge:${h.id}`) : ''}</div></div>
+      <p>${esc(h.rationale || '')}</p><div class="cx-muted">Source: ${esc(label(h.source))} · round ${esc(h.round_created)}</div></div>`).join('')}</div>`;
+  }
+
+  function findings() {
+    const fs = ws.findings || [];
+    if (!fs.length) return empty('No findings yet.');
+    return `<div class="cx-stack">${fs.map((f: any) => `<div class="cx-item">
+      <div class="cx-row between"><div class="cx-item-title">${esc(agentName(f.agent))} · ${esc(f.code)}</div>
+        <div class="cx-row">${pill(label(f.direction), f.direction === 'supports' ? 'serious' : f.direction === 'contradicts' ? 'good' : 'neutral')}
+          ${pill(`confidence ${fmtPct(f.confidence)}`, 'info')}
+          ${f.human_review ? pill(label(f.human_review.action || f.human_review), 'accent') : ''}
+          ${f.excluded_from_adjudication ? pill('excluded', 'critical') : ''}
+          ${can(role, 'review') ? btn('Review', `review:${f.id}`) : ''}</div></div>
+      <p>${esc(f.summary)}</p>
+      ${f.interpretation ? `<p class="cx-muted">${esc(f.interpretation)} <em>(${esc(label(f.interpretation_source))})</em></p>` : ''}
+      ${(f.missing_evidence || []).length ? `<p class="cx-muted">Missing: ${esc(f.missing_evidence.join('; '))}</p>` : ''}
+      ${(f.evidence || []).length ? `<table class="cx-table" style="margin-top:.5rem"><thead><tr><th>Source</th><th>Record</th><th>Field</th><th>Observed</th><th></th></tr></thead><tbody>
+        ${f.evidence.map((e: any) => `<tr><td>${esc(label(e.source_table))}</td><td><code>${esc(e.record_id)}</code></td><td>${esc(e.field)}</td><td>${esc(e.observed_value)}</td>
+          <td>${can(role, 'evidence') && e.source_table !== 'portfolio_aggregates' ? btn('Confirm', `record:confirm_evidence:${e.record_id}`) + ' ' + btn('Dispute', `record:dispute_evidence:${e.record_id}`) : ''}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${(f.calculations || []).length ? `<details style="margin-top:.5rem"><summary class="cx-muted">Calculations (${f.calculations.length})</summary><pre class="cx-pre">${esc(JSON.stringify(f.calculations, null, 2))}</pre></details>` : ''}
+      <div class="cx-muted" style="margin-top:.35rem">Finding ID <code>${esc(f.id)}</code></div></div>`).join('')}</div>`;
+  }
+
+  function challenges() {
+    const cs = ws.challenges || [];
+    if (!cs.length) return empty('No challenges raised.');
+    return `<div class="cx-stack">${cs.map((c: any) => `<div class="cx-item">
+      <div class="cx-row between"><div class="cx-item-title">${esc(label(c.type))} · ${esc(label(c.target_type))}</div>
+        <div class="cx-row">${pill(label(c.status), c.status === 'open' ? 'warning' : 'neutral')} ${pill(label(c.materiality), 'info')}
+          ${can(role, 'resolve') && c.status === 'open' ? btn('Resolve', `resolve:${c.id}`) : ''}</div></div>
+      <p>${esc(c.statement)}</p><div class="cx-muted">Raised by ${esc(requester(c.raised_by || ''))} · round ${esc(c.round)}</div>
+      ${c.resolution ? `<pre class="cx-pre">${esc(typeof c.resolution === 'string' ? c.resolution : JSON.stringify(c.resolution, null, 2))}</pre>` : ''}</div>`).join('')}</div>`;
+  }
+
+  function adjudication() {
+    const adjs = ws.adjudications || [];
+    const decisions = ws.decisions || [];
+    const reviews = ws.reviews || [];
+    return `${adjs.length ? `<div class="cx-stack">${adjs.map((a: any) => `<div class="cx-card">
+        <div class="cx-row between"><h3>Round ${esc(a.round)} adjudication</h3><div class="cx-row">${cls(a.classification, a.severity)} ${pill(`score ${Math.round(a.risk_score ?? 0)}`, 'neutral')} ${pill(`confidence ${fmtPct(a.confidence)}`, 'info')}</div></div>
+        <p style="margin:.25rem 0">${esc(label(a.recommendation || ""))}</p><p class="cx-muted">${esc(a.rationale || '')}</p>
+        <div class="cx-muted">Pathway: ${esc(label(a.pathway))} · exposure at risk ${fmtMoney(a.exposure_at_risk)} · ${esc(label(a.completeness))}</div>
+        ${(a.escalation_reasons || []).length ? `<p class="cx-muted">Escalation: ${esc(a.escalation_reasons.join('; '))}</p>` : ''}
+        ${(a.proposed_interventions || []).length ? `<table class="cx-table" style="margin-top:.6rem"><thead><tr><th>Proposed intervention</th><th>Approval</th><th></th></tr></thead><tbody>
+          ${a.proposed_interventions.map((iv: any) => `<tr><td>${esc(label(iv.code))}</td><td>${iv.requires_approval ? pill('requires approval', 'warning') : pill('no approval needed', 'neutral')}</td>
+            <td>${can(role, 'approve') ? btn('Approve', `iv:approve_intervention:${iv.id}`, 'btn-gold') + ' ' + btn('Reject', `iv:reject_intervention:${iv.id}`) : ''}</td></tr>`).join('')}</tbody></table>` : ''}
+      </div>`).join('')}</div>` : empty('No adjudication yet.')}
+      <div class="cx-card cx-section"><h3>Reviews</h3>${reviews.length ? `<table class="cx-table"><thead><tr><th>Queue</th><th>Stage</th><th>Required role</th><th>Status</th><th>Reasons</th><th>Created</th></tr></thead><tbody>
+        ${reviews.map((r: any) => `<tr><td>${esc(label(r.queue))}</td><td>${esc(label(r.stage))}</td><td>${esc(ROLE_LABEL[r.required_role] || r.required_role)}</td><td>${statusPill(r.status)}</td><td>${esc((r.reasons || []).join('; '))}</td><td>${fmtTime(r.created_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="cx-empty">No review items.</div>'}</div>
+      <div class="cx-card cx-section"><h3>Human decisions</h3>${decisions.length ? `<table class="cx-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Reason</th></tr></thead><tbody>
+        ${decisions.map((d: any) => `<tr><td>${fmtTime(d.created_at)}</td><td>${esc(d.user?.full_name || d.user || '')}<div class="cx-muted">${esc(ROLE_LABEL[d.role] || d.role)}</div></td><td>${esc(label(d.action))}</td><td>${esc(d.reason)}</td></tr>`).join('')}</tbody></table>` : '<div class="cx-empty">No decisions recorded.</div>'}</div>`;
+  }
+
+  function notes() {
+    const ns = ws.notes || [];
+    return `<div class="cx-row" style="margin-bottom:.75rem">${can(role, 'context') ? btn('Add note', 'note', 'btn-gold') : ''}</div>
+      ${ns.length ? `<div class="cx-stack">${ns.map((n: any) => `<div class="cx-item"><div class="cx-row between"><div class="cx-item-title">${esc(label(n.kind))}${n.category ? ` · ${esc(label(n.category))}` : ''}${n.document_name ? ` · ${esc(n.document_name)}` : ''}</div><span class="cx-muted">${fmtTime(n.created_at)}</span></div>
+        <p>${esc(n.content)}</p><div class="cx-muted">${esc(n.user?.full_name || n.user || '')} · ${esc(ROLE_LABEL[n.role] || n.role || '')}</div></div>`).join('')}</div>` : empty('No notes yet.')}`;
+  }
+
+  function monitoring() {
+    const m = ws.monitoring_instructions || {};
+    const evs = ws.monitoring_events || [];
+    return `<div class="cx-row" style="margin-bottom:.75rem">${can(role, 'monitor') ? btn('Set monitoring rules', 'monitor', 'btn-gold') : ''} ${btn('Evaluate rules now', 'evaluate')}</div>
+      <div class="cx-card"><h3>Instructions</h3>${Object.keys(m).length ? `<pre class="cx-pre">${esc(JSON.stringify(m, null, 2))}</pre>` : '<div class="cx-empty">No monitoring instructions.</div>'}</div>
+      <div class="cx-card cx-section"><h3>Monitoring events</h3>${evs.length ? `<pre class="cx-pre">${esc(JSON.stringify(evs, null, 2))}</pre>` : '<div class="cx-empty">No events.</div>'}</div>`;
+  }
+
+  function activity() {
+    const evs = (ws.events || []).slice().reverse();
+    return `<div class="cx-card"><h3>Timeline</h3>${evs.length ? `<ul class="cx-timeline">${evs.map((e: any) => `<li><time>${fmtTime(e.created_at)}</time><div><strong>${esc(label(e.type))}</strong> <span class="cx-muted">· ${esc(e.actor_type === 'agent' ? agentName(e.actor_id || '') : label(e.actor_type))}${e.round ? ` · round ${esc(e.round)}` : ''}</span></div></li>`).join('')}</ul>` : '<div class="cx-empty">No activity yet.</div>'}</div>`;
+  }
+
+  function render() {
+    const target = ws.scope === 'portfolio' ? `Portfolio${ws.segment ? ' · ' + ws.segment : ''}` : ws.customer?.customer_id || ws.customer_id || 'Customer';
+    document.getElementById('inv-title')!.innerHTML = `${esc(target)} <span class="gold-gradient-text">Investigation</span>`;
+    document.getElementById('inv-sub')!.innerHTML = `${statusPill(ws.status)} <span class="cx-muted">${esc(label(ws.run_state))} · round ${esc(ws.round ?? 0)} · opened ${fmtTime(ws.created_at)}</span>`;
+    const eff = ws.effective_classification;
+    set('inv-kpis', [
+      ['Classification', eff ? cls(eff.classification, eff.severity) : '—', eff ? `from ${label(eff.source)}` : 'not yet adjudicated'],
+      ['Hypotheses', (ws.hypotheses || []).length, `${(ws.hypotheses || []).filter((h: any) => h.status === 'supported').length} supported`],
+      ['Findings', (ws.findings || []).length, `${(ws.challenges || []).filter((c: any) => c.status === 'open').length} open challenges`],
+      ['Agent tasks', (ws.tasks || []).length, `${(ws.tasks || []).filter((t: any) => t.status === 'running' || t.status === 'queued').length} in progress`],
+    ].map(([t, v, s]) => `<div class="cx-card cx-kpi"><div class="cx-eyebrow">${t}</div><div class="cx-kpi-value" style="font-size:${typeof v === 'number' ? '1.6rem' : '1rem'}">${v}</div><div class="cx-kpi-sub">${esc(s)}</div></div>`).join(''));
+    set('inv-actions', headerActions());
+    set('p-overview', overview());
+    set('p-hypotheses', hypotheses());
+    set('p-findings', findings());
+    set('p-challenges', challenges());
+    set('p-adjudication', adjudication());
+    set('p-notes', notes());
+    set('p-monitoring', monitoring());
+    set('p-activity', activity());
+  }
+
+  // Delegated clicks for every action button.
+  root.addEventListener('click', (ev) => {
+    const el = (ev.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+    if (!el) return;
+    const [kind, a, b] = el.dataset.act!.split(':');
+    if (ACTIONS[kind]) return ACTIONS[kind]();
+    if (kind === 'challenge') act('Challenge hypothesis', `/hypotheses/${a}/challenge`, [
+      { name: 'statement', label: 'Your challenge', type: 'textarea', required: true, minLength: 5 },
+      { name: 'request_specialist', label: 'Ask a specialist to check (optional)', type: 'select', options: opt(SPECIALISTS, '—') },
+    ], (v) => ({ statement: v.statement, ...(v.request_specialist ? { request_specialist: v.request_specialist } : {}) }));
+    if (kind === 'review') act('Review finding', `/findings/${a}/review`, [
+      { name: 'action', label: 'Decision', type: 'select', options: opt(['accept_finding', 'reject_finding', 'flag_unsupported']) },
+      { name: 'reason', label: 'Reason', type: 'textarea' },
+    ], (v) => ({ action: v.action, reason: v.reason || '' }));
+    if (kind === 'resolve') act('Resolve challenge', `/challenges/${a}/resolve`, [
+      { name: 'action', label: 'Resolution', type: 'select', options: opt(['uphold', 'dismiss']) }, REASON,
+    ], (v) => ({ action: v.action, reason: v.reason }));
+    if (kind === 'record') act(a === 'confirm_evidence' ? 'Confirm evidence' : 'Dispute evidence', `/records/${b}/review`, [REASON], (v) => ({ action: a, reason: v.reason }),
+      { description: a === 'dispute_evidence' ? 'A disputed record is excluded from this investigation.' : 'Marks the record as trusted for this investigation.' });
+    if (kind === 'iv') act(a === 'approve_intervention' ? 'Approve intervention' : 'Reject intervention', `/interventions/${b}/decision`, [REASON], (v) => ({ action: a, reason: v.reason }));
+  });
+
+  document.getElementById('tabs')!.addEventListener('click', (ev) => {
+    const tab = (ev.target as HTMLElement).closest('.cx-tab') as HTMLElement | null;
+    if (!tab) return;
+    document.querySelectorAll('.cx-tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.cx-pane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.pane !== tab.dataset.tab));
+  });
+
+  async function refresh() {
+    ws = await apiGet(BASE);
+    render();
+  }
+
+  // While agents are running, poll the event stream and refresh on change.
+  let lastSeq = 0;
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (!ws || !['running', 'queued', 'pending'].includes(ws.run_state) && ws.status !== 'investigating') return;
+    pollTimer = window.setTimeout(async () => {
+      try {
+        const ev = await apiGet(`${BASE}/events?after_seq=${lastSeq}`);
+        if (ev.events.length) { lastSeq = ev.events.at(-1).seq; await refresh(); }
+        else if (ev.status !== ws.status || ev.run_state !== ws.run_state) await refresh();
+      } catch { /* keep polling */ }
+      schedulePoll();
+    }, 2500);
+  }
+
+  (async () => {
+    try { role = (await me()).role; } catch { /* role stays unassigned */ }
+    try {
+      await refresh();
+      lastSeq = (ws.events || []).reduce((m: number, e: any) => Math.max(m, e.seq || 0), 0);
+      schedulePoll();
+    } catch (e: any) {
+      set('inv-sub', `<span class="cx-error">${esc(e.message)}</span>`);
+    }
+  })();
+</script>

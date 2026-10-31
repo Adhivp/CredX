@@ -1,0 +1,57 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Review Queue">
+  <div class="dash-layout">
+    <DashboardNav active="reviews" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Review <span class="gold-gradient-text">Queue</span></h1>
+          <p class="dash-subtitle">Investigations waiting for a person in your role: analyst reviews, approvals and portfolio decisions, oldest first.</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+      <div class="cx-grid c3" id="kpis"></div>
+      <div class="cx-card cx-section">
+        <div class="cx-row between"><h3>Open review items</h3><span class="cx-muted" id="queues"></span></div>
+        <div class="cx-table-wrap" id="table"><div class="cx-empty">Loading…</div></div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { apiGet, esc, label, fmtTime, statusPill, pill, CLASSIFICATION_TONE, ROLE_LABEL } from '../lib/credx';
+
+  (async () => {
+    const table = document.getElementById('table')!;
+    let d: any;
+    try { d = await apiGet('/api/v1/reviews/queue'); }
+    catch (e: any) { table.innerHTML = `<div class="cx-empty cx-error">${esc(e.message)}</div>`; return; }
+    const items: any[] = d.items || [];
+    document.getElementById('queues')!.textContent = `${ROLE_LABEL[d.role] || d.role} · queues: ${(d.queues || []).map(label).join(', ') || 'none'}`;
+    document.getElementById('kpis')!.innerHTML = [
+      ['Open items', items.length, 'in your queues'],
+      ['Assigned to me', items.filter((i) => i.assigned_to_me).length, 'personally assigned'],
+      ['Oldest', items.length ? fmtTime(items[0].created_at) : '—', 'waiting since'],
+    ].map(([t, v, s]) => `<div class="cx-card cx-kpi"><div class="cx-eyebrow">${t}</div><div class="cx-kpi-value">${esc(v)}</div><div class="cx-kpi-sub">${s}</div></div>`).join('');
+    if (!items.length) { table.innerHTML = '<div class="cx-empty">Nothing is waiting for you.</div>'; return; }
+    table.innerHTML = `<table class="cx-table"><thead><tr><th>Investigation</th><th>Queue · stage</th><th>Status</th><th>Classification</th><th>Why it needs you</th><th>Waiting since</th></tr></thead><tbody>
+      ${items.map((i) => {
+        const inv = i.investigation;
+        const c = inv.effective_classification;
+        return `<tr class="cx-click" data-id="${esc(inv.id)}">
+          <td><strong>${esc(inv.scope === 'portfolio' ? `Portfolio · ${inv.segment || 'all'}` : inv.customer_id)}</strong>${i.assigned_to_me ? ' ' + pill('assigned to me', 'accent') : ''}</td>
+          <td>${esc(label(i.queue))}<div class="cx-muted">${esc(label(i.stage))} · ${esc(ROLE_LABEL[i.required_role] || i.required_role)}</div></td>
+          <td>${statusPill(inv.status)}</td>
+          <td>${c ? pill(label(c.classification), CLASSIFICATION_TONE[c.classification] || 'neutral') : '—'}</td>
+          <td>${esc((i.reasons || []).join('; ') || '—')}</td>
+          <td>${fmtTime(i.created_at)}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    table.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => { window.location.href = `/investigations/${(tr as HTMLElement).dataset.id}`; }));
+  })();
+</script>

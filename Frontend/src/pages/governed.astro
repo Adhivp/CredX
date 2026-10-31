@@ -1,0 +1,178 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Governed EWS">
+  <div class="dash-layout">
+    <DashboardNav active="governed" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Governed <span class="gold-gradient-text">Early Warning</span></h1>
+          <p class="dash-subtitle">The role-checked early warning service: you only see customers in your data scope, every call is audited,
+            and new data automatically re-evaluates monitored investigations.</p>
+        </div>
+        <div class="dash-actions">
+          <button class="btn btn-glass" id="upload-btn" type="button">Upload data</button>
+          <button class="btn btn-gold" id="assess-btn" type="button">Run assessment</button>
+          <OfficerProfileHeader />
+        </div>
+      </header>
+
+      <div class="cx-grid c4" id="kpis"></div>
+
+      <form class="mon-filters cx-section" id="filters">
+        <div class="form-group"><label class="form-label" for="risk_level">Risk level</label>
+          <select id="risk_level" name="risk_level" class="form-select"><option value="">All</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option><option>Insufficient Data</option></select></div>
+        <div class="form-group"><label class="form-label" for="product_type">Product</label><input id="product_type" name="product_type" class="form-input" placeholder="Any product" /></div>
+        <div class="form-group"><label class="form-label" for="customer_segment">Segment</label><input id="customer_segment" name="customer_segment" class="form-input" placeholder="Any segment" /></div>
+        <div class="form-group"><label class="form-label" for="min_score">Minimum score</label><input id="min_score" name="min_score" type="number" min="0" max="100" class="form-input" value="0" /></div>
+      </form>
+
+      <div class="cx-grid c2">
+        <div class="cx-card"><div class="cx-row between"><h3>Watchlist</h3><span class="cx-muted" id="wcount"></span></div>
+          <div class="cx-table-wrap" id="watchlist"><div class="cx-empty">Loading…</div></div></div>
+        <div class="cx-card" id="detail"><h3>Customer</h3><div class="cx-empty">Select a customer from the watchlist.</div></div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { apiGet, apiPost, apiUpload, esc, qs, label, fmtTime, fmtMoney, pill, openForm, toast } from '../lib/credx';
+
+  const V2 = '/api/v2/ews';
+  const RISK_TONE: Record<string, any> = { Critical: 'critical', High: 'serious', Medium: 'warning', Low: 'good' };
+  const riskPill = (r: string) => pill(r, RISK_TONE[r] || 'neutral');
+  const form = document.getElementById('filters') as HTMLFormElement;
+  let selected = '';
+
+  async function loadPortfolio() {
+    try {
+      const p = await apiGet(`${V2}/portfolio`);
+      const dist = p.risk_distribution || {};
+      document.getElementById('kpis')!.innerHTML = [
+        ['Customers in scope', p.total_customers, `${p.total_assessed} assessed`],
+        ['Average score', p.average_warning_score, 'out of 100'],
+        ['Critical + High', (dist.Critical || 0) + (dist.High || 0), 'need attention'],
+        ['Top risk', p.top_risky_customers?.[0]?.customer_id || '—', p.top_risky_customers?.[0] ? `score ${Math.round(p.top_risky_customers[0].warning_score)}` : ''],
+      ].map(([t, v, s]) => `<div class="cx-card cx-kpi"><div class="cx-eyebrow">${t}</div><div class="cx-kpi-value">${esc(v)}</div><div class="cx-kpi-sub">${esc(s)}</div></div>`).join('');
+    } catch (e: any) {
+      document.getElementById('kpis')!.innerHTML = `<div class="cx-card cx-empty cx-error" style="grid-column:1/-1">${esc(e.message)}${e.status === 403 ? ' — ask a risk administrator to assign you a role and data scope.' : ''}</div>`;
+    }
+  }
+
+  async function loadWatchlist() {
+    const box = document.getElementById('watchlist')!;
+    const q = Object.fromEntries(new FormData(form).entries());
+    try {
+      const d = await apiGet(`${V2}/watchlist${qs({ ...q, limit: 200 })}`);
+      const items: any[] = d.items || [];
+      document.getElementById('wcount')!.textContent = `${items.length} of ${d.total}`;
+      if (!items.length) { box.innerHTML = '<div class="cx-empty">No assessed customers in your scope. Upload data and run an assessment.</div>'; return; }
+      box.innerHTML = `<table class="cx-table"><thead><tr><th>Customer</th><th>Score</th><th>Risk</th><th>Exposure</th></tr></thead><tbody>
+        ${items.map((i) => `<tr class="cx-click" data-id="${esc(i.customer_id)}"><td><strong>${esc(i.customer_id)}</strong><div class="cx-muted">${esc(i.product_type)}</div></td>
+          <td>${Math.round(i.warning_score)}</td><td>${riskPill(i.risk_category)}</td><td>${fmtMoney(i.outstanding_exposure)}</td></tr>`).join('')}</tbody></table>`;
+      box.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => loadCustomer((tr as HTMLElement).dataset.id!)));
+    } catch (e: any) { box.innerHTML = `<div class="cx-empty cx-error">${esc(e.message)}</div>`; }
+  }
+
+  async function loadCustomer(id: string) {
+    selected = id;
+    const box = document.getElementById('detail')!;
+    box.innerHTML = '<h3>Customer</h3><div class="cx-empty">Loading…</div>';
+    try {
+      const d = await apiGet(`${V2}/customer/${encodeURIComponent(id)}`);
+      const a = d.assessments?.[0];
+      box.innerHTML = `<div class="cx-row between"><h3>${esc(d.customer.customer_id)}</h3>${a ? riskPill(a.risk_category) : ''}</div>
+        <p class="cx-muted" style="margin-top:0">${esc(label(d.customer.customer_type))} · ${esc(d.customer.portfolio_segment || '')} · ${(d.loans || []).length} facilities · ${(d.repayments || []).length} repayments</p>
+        ${a ? `<div class="cx-grid c2"><div class="cx-item"><div class="cx-eyebrow">Warning score</div><div class="cx-kpi-value">${Math.round(a.warning_score)}</div></div>
+          <div class="cx-item"><div class="cx-eyebrow">Assessed</div><div class="cx-item-title">${fmtTime(a.assessed_at)}</div></div></div>
+          <div class="cx-section">${(a.top_indicators || []).map((t: string) => `<div class="cx-item" style="margin-top:.4rem">${esc(t)}</div>`).join('')}</div>` : '<div class="cx-empty">Not assessed yet.</div>'}
+        <div class="cx-row cx-section">
+          <button class="btn btn-gold cx-btn-sm" id="explain-btn" type="button">Explain</button>
+          ${a ? `<button class="btn btn-glass cx-btn-sm" id="alert-btn" type="button" data-assessment="${esc(a.id)}">Classify alert</button>` : ''}
+          <button class="btn btn-glass cx-btn-sm" id="reassess-btn" type="button">Re-assess</button>
+          <button class="btn btn-glass cx-btn-sm" id="investigate-btn" type="button">Open investigation</button>
+        </div>
+        <div id="explain-out"></div>
+        ${(d.alerts || []).length ? `<div class="cx-section"><div class="cx-eyebrow">Alert decisions</div>${d.alerts.map((al: any) => `<div class="cx-item" style="margin-top:.4rem"><div class="cx-item-title">${esc(al.decision || al.analyst_decision || '')}</div><p>${esc(al.reason || al.analyst_reason || '')}</p></div>`).join('')}</div>` : ''}`;
+      document.getElementById('explain-btn')!.addEventListener('click', explain);
+      document.getElementById('reassess-btn')!.addEventListener('click', () => assess(id));
+      document.getElementById('alert-btn')?.addEventListener('click', (ev) => classify((ev.currentTarget as HTMLElement).dataset.assessment!));
+      document.getElementById('investigate-btn')!.addEventListener('click', async () => {
+        try { const inv = await apiPost('/api/v1/investigations', { scope: 'customer', customer_id: id }); window.location.href = `/investigations/${inv.id}`; }
+        catch (e: any) { toast(e.message, 'critical'); }
+      });
+    } catch (e: any) { box.innerHTML = `<h3>Customer</h3><div class="cx-empty cx-error">${esc(e.message)}</div>`; }
+  }
+
+  async function explain() {
+    const out = document.getElementById('explain-out')!;
+    out.innerHTML = '<div class="cx-empty">Explaining…</div>';
+    try {
+      const e = await apiPost(`${V2}/explain/${encodeURIComponent(selected)}`);
+      out.innerHTML = `<div class="cx-item cx-section"><div class="cx-row between"><div class="cx-eyebrow">Explanation</div>${pill(e.source === 'ai' ? `AI · ${e.model || ''}` : 'deterministic', e.source === 'ai' ? 'info' : 'neutral')}</div>
+        <p>${esc(e.explanation)}</p>
+        ${(e.recommended_actions || []).length ? `<div class="cx-eyebrow" style="margin-top:.6rem">Recommended</div><ul style="margin:.2rem 0 0 1rem">${e.recommended_actions.map((r: string) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}</div>`;
+    } catch (err: any) { out.innerHTML = `<div class="cx-error">${esc(err.message)}</div>`; }
+  }
+
+  function classify(assessmentId: string) {
+    openForm({
+      title: 'Classify alert',
+      fields: [
+        { name: 'decision', label: 'Decision', type: 'select', options: ['Continue Monitoring', 'Requires Investigation', 'False Positive', 'Escalate for Review'].map((v) => ({ value: v, text: v })) },
+        { name: 'reason', label: 'Reason', type: 'textarea', required: true },
+      ],
+      submit: 'Save decision',
+      onSubmit: async (v) => { await apiPost(`${V2}/alert/${assessmentId}`, { decision: v.decision, reason: v.reason }); toast('Alert classified'); loadCustomer(selected); },
+    });
+  }
+
+  async function assess(customerId?: string) {
+    try {
+      const r = await apiPost(`${V2}/assess${qs({ customer_id: customerId })}`);
+      toast(`Assessed ${r.total_assessed} customer${r.total_assessed === 1 ? '' : 's'}`);
+      await Promise.all([loadPortfolio(), loadWatchlist()]);
+      if (customerId) loadCustomer(customerId);
+    } catch (e: any) { toast(e.message, 'critical'); }
+  }
+
+  document.getElementById('assess-btn')!.addEventListener('click', () => assess());
+  document.getElementById('upload-btn')!.addEventListener('click', () => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'cx-dialog';
+    dialog.innerHTML = `<form class="cx-dialog-form" method="dialog"><h3 class="cx-dialog-title">Upload data</h3>
+      <p class="cx-dialog-desc">Rows outside your data scope are skipped. New repayment, cash-flow or exposure data re-evaluates monitored investigations.</p>
+      <div class="form-group"><label class="form-label" for="u-type">Data type</label><select id="u-type" class="form-select">${['customers', 'loans', 'repayments', 'exposure', 'cashflow'].map((t) => `<option>${t}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label" for="u-file">File (CSV, Excel or JSON)</label><input id="u-file" type="file" class="form-input" accept=".csv,.xlsx,.xls,.json" required /></div>
+      <p class="cx-dialog-error" hidden></p>
+      <div class="cx-dialog-actions"><button type="button" class="btn btn-glass" data-cancel>Cancel</button><button type="submit" class="btn btn-gold">Upload</button></div></form>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector('[data-cancel]')!.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => dialog.remove());
+    dialog.querySelector('form')!.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const file = (dialog.querySelector('#u-file') as HTMLInputElement).files?.[0];
+      const err = dialog.querySelector('.cx-dialog-error') as HTMLElement;
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const type = (dialog.querySelector('#u-type') as HTMLSelectElement).value;
+        const r = await apiUpload(`${V2}/upload${qs({ data_type: type })}`, fd);
+        toast(`Loaded ${r.records_loaded} rows${r.errors?.length ? ` · ${r.errors.length} skipped` : ''}`);
+        dialog.close();
+        loadWatchlist();
+      } catch (e: any) { err.textContent = e.message; err.hidden = false; }
+    });
+    dialog.showModal();
+  });
+
+  form.addEventListener('change', loadWatchlist);
+  loadPortfolio();
+  loadWatchlist();
+</script>

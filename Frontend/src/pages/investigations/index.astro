@@ -1,0 +1,124 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Investigations">
+  <div class="dash-layout">
+    <DashboardNav active="investigations" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Agent <span class="gold-gradient-text">Investigations</span></h1>
+          <p class="dash-subtitle">Evidence-driven investigations run by specialist AI agents, challenged and adjudicated,
+            with every conclusion handed to a person for review and decision.</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <div class="cx-row between">
+        <form class="mon-filters" id="filters" style="margin:0">
+          <div class="form-group"><label class="form-label" for="status">Status</label>
+            <select id="status" name="status" class="form-select">
+              <option value="">All</option>
+              <option value="investigating">Investigating</option>
+              <option value="awaiting_analyst_review">Awaiting analyst review</option>
+              <option value="awaiting_approval">Awaiting approval</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="incomplete">Incomplete</option>
+              <option value="monitoring">Monitoring</option>
+              <option value="reopened">Reopened</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="failed">Failed</option>
+            </select></div>
+        </form>
+        <button class="btn btn-gold" id="new-inv" type="button">+ New investigation</button>
+      </div>
+
+      <div class="cx-grid c4 cx-section" id="kpis"></div>
+      <div class="cx-card cx-section">
+        <div class="cx-row between"><h3>Investigations</h3><span class="cx-muted" id="count"></span></div>
+        <div class="cx-table-wrap" id="table"><div class="cx-empty">Loading…</div></div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { apiGet, apiPost, esc, qs, label, fmtTime, statusPill, pill, CLASSIFICATION_TONE, SEVERITY_TONE, openForm, toast, me, ROLE_LABEL } from '../../lib/credx';
+
+  const form = document.getElementById('filters') as HTMLFormElement;
+  const SPECIALISTS = ['repayment_specialist', 'cashflow_specialist', 'exposure_specialist', 'baseline_specialist', 'integrity_specialist', 'portfolio_specialist'];
+
+  function classification(c: any) {
+    if (!c) return '<span class="cx-muted">—</span>';
+    return `${pill(label(c.classification), CLASSIFICATION_TONE[c.classification] || 'neutral')} ${c.severity ? pill(label(c.severity), SEVERITY_TONE[c.severity] || 'neutral') : ''}`;
+  }
+
+  async function load() {
+    const table = document.getElementById('table')!;
+    const status = (form.elements.namedItem('status') as HTMLSelectElement).value;
+    let d: any;
+    try {
+      d = await apiGet(`/api/v1/investigations${qs({ status, limit: 200 })}`);
+    } catch (e: any) {
+      table.innerHTML = `<div class="cx-empty cx-error">${esc(e.message)}${e.status === 403 ? ' — ask a risk administrator to assign you a role (Administration page).' : ''}</div>`;
+      return;
+    }
+    const items: any[] = d.items || [];
+    const by = (s: string) => items.filter((i) => i.status === s).length;
+    document.getElementById('kpis')!.innerHTML = [
+      ['Total', items.length, 'in your scope'],
+      ['Investigating', by('investigating'), 'agents working'],
+      ['Awaiting review', by('awaiting_analyst_review') + by('awaiting_approval'), 'need a person'],
+      ['Monitoring', by('monitoring'), 'closed with watch rules'],
+    ].map(([t, v, s]) => `<div class="cx-card cx-kpi"><div class="cx-eyebrow">${t}</div><div class="cx-kpi-value">${v}</div><div class="cx-kpi-sub">${s}</div></div>`).join('');
+    document.getElementById('count')!.textContent = `${items.length} shown`;
+    if (!items.length) { table.innerHTML = '<div class="cx-empty">No investigations yet. Start one with “New investigation”.</div>'; return; }
+    table.innerHTML = `<table class="cx-table"><thead><tr><th>Target</th><th>Status</th><th>Classification</th><th>Round</th><th>Trigger</th><th>Updated</th></tr></thead><tbody>${items.map((i) => `
+      <tr class="cx-click" data-id="${esc(i.id)}">
+        <td><strong>${esc(i.scope === 'portfolio' ? `Portfolio · ${i.segment || 'all segments'}` : i.customer_id)}</strong><div class="cx-muted">${esc(i.scope === 'customer' ? i.segment || '' : '')}</div></td>
+        <td>${statusPill(i.status)}<div class="cx-muted">${esc(label(i.run_state))}</div></td>
+        <td>${classification(i.effective_classification)}</td>
+        <td>${esc(i.round ?? '—')}</td>
+        <td>${esc(label(i.trigger))}</td>
+        <td>${fmtTime(i.updated_at)}</td>
+      </tr>`).join('')}</tbody></table>`;
+    table.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => {
+      window.location.href = `/investigations/${(tr as HTMLElement).dataset.id}`;
+    }));
+  }
+
+  document.getElementById('new-inv')!.addEventListener('click', () => {
+    openForm({
+      title: 'New investigation',
+      description: 'Agents gather evidence and propose a classification; a person reviews and decides. For a portfolio investigation leave the customer empty and give a segment.',
+      fields: [
+        { name: 'scope', label: 'Scope', type: 'select', options: [{ value: 'customer', text: 'Customer' }, { value: 'portfolio', text: 'Portfolio segment' }] },
+        { name: 'customer_id', label: 'Customer ID (for a customer investigation)', placeholder: 'e.g. T3-003' },
+        { name: 'portfolio_segment', label: 'Portfolio segment (for a portfolio investigation)', placeholder: 'e.g. retail' },
+        { name: 'question', label: 'Question for the agents', type: 'textarea', placeholder: 'Is this customer deteriorating, and why?' },
+        { name: 'context', label: 'Context you already know (optional)', type: 'textarea' },
+        { name: 'context_category', label: 'Context category', type: 'select', options: [{ value: '', text: '—' }, ...['temporary_disruption', 'seasonal_business', 'income_change', 'dispute_or_error', 'new_obligation', 'other'].map((v) => ({ value: v, text: label(v) }))] },
+        { name: 'specialist', label: 'Ask a specific specialist first (optional)', type: 'select', options: [{ value: '', text: 'Let the director decide' }, ...SPECIALISTS.map((v) => ({ value: v, text: label(v) }))] },
+      ],
+      submit: 'Start investigation',
+      onSubmit: async (v) => {
+        const body: any = { scope: v.scope, question: v.question || '' };
+        if (v.scope === 'customer') body.customer_id = v.customer_id.trim();
+        else if (v.portfolio_segment) body.portfolio_segment = v.portfolio_segment.trim();
+        if (v.context) body.context = v.context;
+        if (v.context_category) body.context_category = v.context_category;
+        if (v.specialist) body.requested_specialists = [v.specialist];
+        const inv = await apiPost('/api/v1/investigations', body);
+        toast('Investigation started');
+        window.location.href = `/investigations/${inv.id}`;
+      },
+    });
+  });
+
+  form.addEventListener('change', load);
+  load();
+</script>

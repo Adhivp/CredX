@@ -1,0 +1,136 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Administration">
+  <div class="dash-layout">
+    <DashboardNav active="admin" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Risk <span class="gold-gradient-text">Administration</span></h1>
+          <p class="dash-subtitle">Assign roles, approval limits and data scopes, and manage the versioned institution policy. Every change needs a reason and is audited.</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <nav class="cx-tabs" id="tabs" style="margin-top:0">
+        <button class="cx-tab active" data-tab="users">Users &amp; roles</button>
+        <button class="cx-tab" data-tab="policies">Institution policy</button>
+      </nav>
+      <section class="cx-pane" data-pane="users">
+        <div class="cx-card"><div class="cx-row between"><h3>Users</h3><span class="cx-muted" id="ucount"></span></div>
+          <div class="cx-table-wrap" id="users"><div class="cx-empty">Loading…</div></div></div>
+      </section>
+      <section class="cx-pane" data-pane="policies" hidden>
+        <div class="cx-row" style="margin-bottom:.75rem"><button class="btn btn-gold" id="new-policy" type="button">New policy version</button></div>
+        <div id="policies"><div class="cx-card cx-empty">Loading…</div></div>
+      </section>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { apiGet, apiPost, apiPut, apiDelete, esc, label, fmtTime, fmtMoney, pill, openForm, toast, ROLE_LABEL } from '../lib/credx';
+
+  const ROLES = Object.keys(ROLE_LABEL);
+  const REASON = { name: 'reason', label: 'Reason (audited)', type: 'textarea' as const, required: true, minLength: 5 };
+  let users: any[] = [];
+  let policies: any[] = [];
+
+  const scopeText = (s: any) => (s.scope_type === 'all' ? 'All customers' : `${label(s.scope_type)}: ${s.scope_value}`);
+
+  async function loadUsers() {
+    const box = document.getElementById('users')!;
+    try { users = (await apiGet('/api/v1/admin/users')).items || []; }
+    catch (e: any) { box.innerHTML = `<div class="cx-empty cx-error">${esc(e.message)}${e.status === 403 ? ' — only a Risk Administrator can manage users.' : ''}</div>`; return; }
+    document.getElementById('ucount')!.textContent = `${users.length} users`;
+    box.innerHTML = `<table class="cx-table"><thead><tr><th>User</th><th>Role</th><th>Approval limit</th><th>Scopes</th><th>Status</th><th></th></tr></thead><tbody>
+      ${users.map((u) => `<tr>
+        <td><strong>${esc(u.full_name)}</strong><div class="cx-muted">${esc(u.email)}</div></td>
+        <td>${pill(ROLE_LABEL[u.role] || u.role, u.role === 'unassigned' ? 'warning' : u.role === 'risk_admin' ? 'accent' : 'info')}</td>
+        <td>${u.approval_limit != null ? fmtMoney(u.approval_limit) : '—'}</td>
+        <td>${(u.scopes || []).length ? u.scopes.map((s: any) => `<span class="cx-row" style="gap:.3rem;margin:.1rem 0">${pill(scopeText(s), 'neutral')}<button class="btn btn-glass cx-btn-sm cx-btn-danger" data-revoke="${esc(u.id)}" data-type="${esc(s.scope_type)}" data-value="${esc(s.scope_value)}" title="Revoke scope">×</button></span>`).join('') : '<span class="cx-muted">none</span>'}</td>
+        <td>${u.is_active ? pill('active', 'good') : pill('inactive', 'neutral')}</td>
+        <td><div class="cx-row"><button class="btn btn-glass cx-btn-sm" data-role="${esc(u.id)}">Role</button><button class="btn btn-glass cx-btn-sm" data-scope="${esc(u.id)}">+ Scope</button></div></td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
+  async function loadPolicies() {
+    const box = document.getElementById('policies')!;
+    try { policies = (await apiGet('/api/v1/admin/policies')).items || []; }
+    catch (e: any) { box.innerHTML = `<div class="cx-card cx-empty cx-error">${esc(e.message)}</div>`; return; }
+    if (!policies.length) { box.innerHTML = '<div class="cx-card cx-empty">No stored policy versions: the built-in default policy is in effect.</div>'; return; }
+    box.innerHTML = policies.map((p) => `<div class="cx-card"><div class="cx-row between"><h3>Version ${esc(p.version)}</h3>${p.is_active ? pill('active', 'good') : pill('inactive', 'neutral')}</div>
+      <div class="cx-muted">${fmtTime(p.created_at)} · ${esc(p.change_reason || '')}</div>
+      <details ${p.is_active ? 'open' : ''}><summary class="cx-muted" style="margin-top:.5rem">Configuration</summary><pre class="cx-pre">${esc(JSON.stringify(p.config, null, 2))}</pre></details></div>`).join('');
+  }
+
+  document.getElementById('users')!.addEventListener('click', (ev) => {
+    const el = ev.target as HTMLElement;
+    const roleId = el.closest('[data-role]')?.getAttribute('data-role');
+    const scopeId = el.closest('[data-scope]')?.getAttribute('data-scope');
+    const revoke = el.closest('[data-revoke]') as HTMLElement | null;
+    if (roleId) {
+      const u = users.find((x) => x.id === roleId);
+      openForm({
+        title: `Role for ${u.full_name}`,
+        fields: [
+          { name: 'role', label: 'Role', type: 'select', value: u.role, options: ROLES.map((r) => ({ value: r, text: ROLE_LABEL[r] })) },
+          { name: 'approval_limit', label: 'Approval limit in ₹ (managers only, optional)', value: u.approval_limit != null ? String(u.approval_limit) : '' },
+          REASON,
+        ],
+        submit: 'Save role',
+        onSubmit: async (v) => {
+          await apiPut(`/api/v1/admin/users/${roleId}/role`, { role: v.role, approval_limit: v.approval_limit.trim() === '' ? null : Number(v.approval_limit), reason: v.reason });
+          toast('Role updated'); loadUsers();
+        },
+      });
+    } else if (scopeId) {
+      openForm({
+        title: 'Grant data scope',
+        description: '“All customers” sees everything; a segment or customer scope limits what this user can see and act on.',
+        fields: [
+          { name: 'scope_type', label: 'Scope type', type: 'select', options: [{ value: 'all', text: 'All customers' }, { value: 'segment', text: 'Portfolio segment' }, { value: 'customer', text: 'Single customer' }] },
+          { name: 'scope_value', label: 'Segment or customer ID (leave empty for All)' },
+          REASON,
+        ],
+        submit: 'Grant scope',
+        onSubmit: async (v) => { await apiPost(`/api/v1/admin/users/${scopeId}/scopes`, { scope_type: v.scope_type, scope_value: v.scope_value || '', reason: v.reason }); toast('Scope granted'); loadUsers(); },
+      });
+    } else if (revoke) {
+      openForm({
+        title: 'Revoke scope', fields: [REASON], submit: 'Revoke',
+        onSubmit: async (v) => { await apiDelete(`/api/v1/admin/users/${revoke.dataset.revoke}/scopes`, { scope_type: revoke.dataset.type, scope_value: revoke.dataset.value || '', reason: v.reason }); toast('Scope revoked'); loadUsers(); },
+      });
+    }
+  });
+
+  document.getElementById('new-policy')!.addEventListener('click', () => {
+    const current = policies.find((p) => p.is_active)?.config || {};
+    openForm({
+      title: 'New policy version',
+      description: 'Edit the JSON configuration. The new version becomes active; earlier versions are kept for audit.',
+      fields: [{ name: 'config', label: 'Configuration (JSON)', type: 'textarea', required: true, value: JSON.stringify(current, null, 2) }, REASON],
+      submit: 'Publish version',
+      onSubmit: async (v) => {
+        let config: any;
+        try { config = JSON.parse(v.config); } catch { throw new Error('Configuration is not valid JSON'); }
+        await apiPost('/api/v1/admin/policies', { config, reason: v.reason });
+        toast('Policy published'); loadPolicies();
+      },
+    });
+  });
+
+  document.getElementById('tabs')!.addEventListener('click', (ev) => {
+    const tab = (ev.target as HTMLElement).closest('.cx-tab') as HTMLElement | null;
+    if (!tab) return;
+    document.querySelectorAll('.cx-tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.cx-pane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.pane !== tab.dataset.tab));
+  });
+
+  loadUsers();
+  loadPolicies();
+</script>

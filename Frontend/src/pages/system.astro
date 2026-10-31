@@ -1,0 +1,124 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — System & Audit">
+  <div class="dash-layout">
+    <DashboardNav active="system" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">System &amp; <span class="gold-gradient-text">Audit</span></h1>
+          <p class="dash-subtitle">Engine and AI provider health, the append-only audit log of every allowed and denied action, and portfolio intelligence.</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <nav class="cx-tabs" id="tabs" style="margin-top:0">
+        <button class="cx-tab active" data-tab="status">System status</button>
+        <button class="cx-tab" data-tab="audit">Audit log</button>
+        <button class="cx-tab" data-tab="intel">Portfolio intelligence</button>
+      </nav>
+
+      <section class="cx-pane" data-pane="status">
+        <div class="cx-row" style="margin-bottom:.75rem"><button class="btn btn-glass" id="probe" type="button">Probe AI provider</button></div>
+        <div id="status"><div class="cx-card cx-empty">Loading…</div></div>
+      </section>
+
+      <section class="cx-pane" data-pane="audit" hidden>
+        <form class="mon-filters" id="audit-filters">
+          <div class="form-group"><label class="form-label" for="a-res">Resource ID</label><input id="a-res" name="resource_id" class="form-input" placeholder="Any" /></div>
+          <div class="form-group"><label class="form-label" for="a-out">Outcome</label>
+            <select id="a-out" name="outcome" class="form-select"><option value="">Any</option><option value="allowed">Allowed</option><option value="denied">Denied</option></select></div>
+          <div class="form-group"><label class="form-label" for="a-lim">Show</label>
+            <select id="a-lim" name="limit" class="form-select"><option value="100">100</option><option value="250">250</option><option value="500">500</option></select></div>
+        </form>
+        <div class="cx-card"><div class="cx-table-wrap" id="audit"><div class="cx-empty">Loading…</div></div></div>
+      </section>
+
+      <section class="cx-pane" data-pane="intel" hidden>
+        <form class="mon-filters" id="intel-filters">
+          <div class="form-group"><label class="form-label" for="i-seg">Segment</label><input id="i-seg" name="segment" class="form-input" placeholder="All segments" /></div>
+          <div class="form-group" style="flex:0"><label class="form-label">&nbsp;</label><button class="btn btn-gold" type="submit">Analyse</button></div>
+        </form>
+        <div id="intel"><div class="cx-card cx-empty">Loading…</div></div>
+      </section>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { apiGet, esc, qs, label, fmtTime, fmtMoney, pill, toast, ROLE_LABEL } from '../lib/credx';
+
+  const kv = (rows: [string, string][]) => `<table class="cx-table">${rows.map(([k, v]) => `<tr><td style="width:40%">${esc(k)}</td><td>${v}</td></tr>`).join('')}</table>`;
+  const tone = (s: string) => (['available', 'configured', 'ok', 'reachable'].includes(s) ? 'good' : s === 'disabled' ? 'neutral' : 'warning');
+
+  async function loadStatus(probe = false) {
+    const box = document.getElementById('status')!;
+    try {
+      const d = await apiGet(`/api/v1/system/status${probe ? '?probe=true' : ''}`);
+      const llm = d.llm || {};
+      const ml = d.ml || {};
+      box.innerHTML = `<div class="cx-grid c3">
+        <div class="cx-card"><div class="cx-eyebrow">Deterministic engine</div><div class="cx-kpi-value" style="font-size:1.1rem">${pill(label(d.deterministic_engine?.status), tone(d.deterministic_engine?.status))}</div><div class="cx-kpi-sub">Scoring version ${esc(d.deterministic_engine?.scoring_version)}</div></div>
+        <div class="cx-card"><div class="cx-eyebrow">AI provider</div><div class="cx-kpi-value" style="font-size:1.1rem">${pill(label(llm.status), tone(llm.status))}</div><div class="cx-kpi-sub">${esc(llm.model || '')}</div></div>
+        <div class="cx-card"><div class="cx-eyebrow">Active policy</div><div class="cx-kpi-value" style="font-size:1.1rem">v${esc(d.policy?.version)}</div><div class="cx-kpi-sub">${esc(d.policy?.name || '')} · you are ${esc(ROLE_LABEL[d.user?.role] || d.user?.role)}</div></div>
+      </div>
+      <div class="cx-grid c2 cx-section">
+        <div class="cx-card"><h3>AI provider</h3>${kv([
+          ['Provider', esc(label(llm.provider))], ['Base URL', `<code>${esc(llm.base_url || '')}</code>`],
+          ['Last successful call', fmtTime(llm.last_successful_call_at)],
+          ['Recent calls', esc(Object.entries(llm.call_status_counts || {}).map(([k, v]) => `${k}: ${v}`).join(', ') || 'none')],
+          ['Probe', llm.probe ? esc(JSON.stringify(llm.probe)) : '<span class="cx-muted">not run (risk administrators only)</span>'],
+        ])}<p class="cx-muted">${esc(llm.note || '')}</p></div>
+        <div class="cx-card"><h3>Machine-learning models</h3><pre class="cx-pre">${esc(JSON.stringify(ml, null, 2))}</pre></div>
+      </div>`;
+      if (probe) toast('Provider probed');
+    } catch (e: any) { box.innerHTML = `<div class="cx-card cx-empty cx-error">${esc(e.message)}</div>`; }
+  }
+
+  async function loadAudit() {
+    const box = document.getElementById('audit')!;
+    const q = Object.fromEntries(new FormData(document.getElementById('audit-filters') as HTMLFormElement).entries());
+    try {
+      const d = await apiGet(`/api/v1/audit/logs${qs(q)}`);
+      const items: any[] = d.items || [];
+      if (!items.length) { box.innerHTML = '<div class="cx-empty">No audit entries match.</div>'; return; }
+      box.innerHTML = `<table class="cx-table"><thead><tr><th>When</th><th>Role</th><th>Action</th><th>Resource</th><th>Outcome</th><th>Detail</th></tr></thead><tbody>
+        ${items.map((r) => `<tr><td>${fmtTime(r.created_at)}</td><td>${esc(ROLE_LABEL[r.role] || r.role)}</td><td>${esc(label(r.action))}</td>
+          <td>${esc(label(r.resource_type))}<div class="cx-muted"><code>${esc(r.resource_id)}</code></div></td>
+          <td>${pill(r.outcome, r.outcome === 'allowed' ? 'good' : 'critical')}</td>
+          <td><code class="cx-muted">${esc(JSON.stringify(r.detail)).slice(0, 160)}</code></td></tr>`).join('')}</tbody></table>`;
+    } catch (e: any) { box.innerHTML = `<div class="cx-empty cx-error">${esc(e.message)}${e.status === 403 ? ' — the audit log is for auditors and risk administrators.' : ''}</div>`; }
+  }
+
+  async function loadIntel() {
+    const box = document.getElementById('intel')!;
+    const segment = (document.getElementById('i-seg') as HTMLInputElement).value.trim();
+    try {
+      const d = await apiGet(`/api/v1/portfolio/intelligence${qs({ segment })}`);
+      const { calculation, ...rest } = d;
+      const numbers = Object.entries(rest).filter(([, v]) => typeof v === 'number') as [string, number][];
+      const others = Object.entries(rest).filter(([, v]) => typeof v !== 'number');
+      box.innerHTML = `${numbers.length ? `<div class="cx-grid c4">${numbers.slice(0, 8).map(([k, v]) => `<div class="cx-card cx-kpi"><div class="cx-eyebrow">${esc(label(k))}</div><div class="cx-kpi-value" style="font-size:1.3rem">${/exposure|amount|balance|loss/i.test(k) ? fmtMoney(v) : esc(Number.isInteger(v) ? v : v.toFixed(3))}</div></div>`).join('')}</div>` : ''}
+        ${others.map(([k, v]) => `<div class="cx-card cx-section"><h3>${esc(label(k))}</h3><pre class="cx-pre">${esc(JSON.stringify(v, null, 2))}</pre></div>`).join('')}
+        <p class="cx-muted cx-section">Calculation ${esc(calculation?.name)} v${esc(calculation?.version)} · input digest <code>${esc((calculation?.input_digest || '').slice(0, 16))}</code></p>`;
+    } catch (e: any) { box.innerHTML = `<div class="cx-card cx-empty cx-error">${esc(e.message)}</div>`; }
+  }
+
+  document.getElementById('probe')!.addEventListener('click', () => loadStatus(true));
+  document.getElementById('audit-filters')!.addEventListener('change', loadAudit);
+  document.getElementById('intel-filters')!.addEventListener('submit', (e) => { e.preventDefault(); loadIntel(); });
+  document.getElementById('tabs')!.addEventListener('click', (ev) => {
+    const tab = (ev.target as HTMLElement).closest('.cx-tab') as HTMLElement | null;
+    if (!tab) return;
+    document.querySelectorAll('.cx-tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.cx-pane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.pane !== tab.dataset.tab));
+  });
+
+  loadStatus();
+  loadAudit();
+  loadIntel();
+</script>

@@ -50,3 +50,4 @@ class UserResponse(BaseModel):
     full_name: str
     is_active: bool
     created_at: int
+    role: str = "unassigned"

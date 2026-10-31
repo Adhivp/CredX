@@ -1,0 +1,228 @@
+/* ==========================================================================
+   CredX Light Theme ("light obsidian")
+   Design concept from the Frontend branch: white and slate surfaces, ink text,
+   ink-filled primary actions instead of gold, soft borders and shadows, mono
+   uppercase labels. Written for our own class names; applies to every app page
+   (.dash-layout). Remove the import in Layout.astro to return to the dark theme.
+   ========================================================================== */
+
+.dash-layout {
+  /* Palette */
+  --ink-900: #0F172A;
+  --ink-800: #1E293B;
+  --slate-600: #475569;
+  --slate-500: #64748B;
+  --slate-400: #94A3B8;
+  --slate-300: #CBD5E1;
+  --slate-200: #E2E8F0;
+  --slate-100: #F1F5F9;
+  --slate-50: #F8FAFC;
+
+  /* Semantic tokens: every component built on tokens turns light */
+  --bg-canvas: #F8F9FA;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-input: #FFFFFF;
+  --bg-input-active: #FFFFFF;
+  --text-primary: var(--ink-900);
+  --text-secondary: var(--slate-600);
+  --text-muted: var(--slate-500);
+  --text-accent: var(--ink-900);
+  --logo-title-color: var(--ink-900);
+  --logo-accent-color: var(--ink-900);
+  --border-subtle: var(--slate-100);
+  --border-medium: var(--slate-200);
+  --border-strong: var(--slate-300);
+  --border-accent: var(--ink-900);
+
+  /* The dark theme draws with translucent white; on white that becomes translucent ink */
+  --white: #0F172A;
+  --white-90: rgba(15, 23, 42, 0.90);
+  --white-75: rgba(15, 23, 42, 0.72);
+  --white-60: rgba(15, 23, 42, 0.58);
+  --white-40: rgba(15, 23, 42, 0.42);
+  --white-20: rgba(15, 23, 42, 0.14);
+  --white-10: rgba(15, 23, 42, 0.08);
+  --white-05: rgba(15, 23, 42, 0.05);
+  --white-03: rgba(15, 23, 42, 0.03);
+
+  /* Gold stays as a small accent but darkened for contrast on white */
+  --gold-300: #D97706;
+  --gold-400: #B45309;
+  --gold-500: #B45309;
+  --gold-600: #92400E;
+
+  /* Gold accents become ink */
+  --gold-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  --gold-gradient-hover: linear-gradient(135deg, #334155 0%, #1E293B 100%);
+  --gold-gradient-card: linear-gradient(135deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0) 100%);
+  --gold-border-gradient: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.12), transparent);
+
+  --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-float: 0 18px 40px rgba(15, 23, 42, 0.12);
+  --shadow-gold: 0 2px 6px rgba(15, 23, 42, 0.10);
+  --shadow-gold-lg: 0 6px 16px rgba(15, 23, 42, 0.12);
+
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(241, 245, 249, 0.8) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(248, 250, 252, 0.8) 0, transparent 50%);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+body:has(.dash-layout) { background: #F8F9FA; }
+
+/* Typography: ink titles, no gold gradient text */
+.dash-layout .dash-title { color: var(--ink-900); letter-spacing: -0.03em; }
+.dash-layout .gold-gradient-text,
+.dash-layout .gold-text {
+  background: none; -webkit-background-clip: initial; background-clip: initial;
+  -webkit-text-fill-color: currentColor; color: var(--ink-900);
+}
+.dash-layout .dash-subtitle { color: var(--slate-500); }
+.dash-layout .dash-header { border-bottom: 1px solid var(--slate-200); }
+.dash-layout .panel-eyebrow,
+.dash-layout .table-eyebrow,
+.dash-layout .header-date,
+.dash-layout .nav-section-title {
+  font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate-500);
+}
+
+/* Sidebar: white, slate hover, ink-filled active item */
+.dash-layout .dash-nav {
+  background: #FFFFFF;
+  border-right: 1px solid var(--slate-200);
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
+}
+.dash-layout .nav-item { color: var(--slate-600); border-radius: 10px; }
+.dash-layout .nav-item:hover { background: var(--slate-100); color: var(--ink-900); }
+.dash-layout .nav-item.active {
+  background: var(--ink-900); color: #FFFFFF;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+}
+.dash-layout .nav-item.active .nav-icon-wrap,
+.dash-layout .nav-item.active .nav-text { color: #FFFFFF; }
+.dash-layout .active-indicator { display: none; }
+
+/* Buttons: ink primary, white secondary */
+.dash-layout .btn { border-radius: 8px; }
+.dash-layout .btn-gold,
+.dash-layout .btn-primary {
+  background: var(--ink-900); color: #FFFFFF; border: 1px solid var(--ink-900);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+}
+.dash-layout .btn-gold:hover,
+.dash-layout .btn-primary:hover { background: var(--ink-800); border-color: var(--ink-800); box-shadow: 0 4px 8px rgba(15, 23, 42, 0.12); }
+.dash-layout .btn-gold * { color: #FFFFFF; }
+.dash-layout .btn-glass {
+  background: #FFFFFF; color: var(--ink-900); border: 1px solid var(--slate-300);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.dash-layout .btn-glass:hover { background: var(--slate-50); border-color: var(--slate-400); }
+
+/* Cards and panels: white, hairline border, soft shadow */
+.dash-layout .stat-card,
+.dash-layout .dossier-panel,
+.dash-layout .mon-panel,
+.dash-layout .table-card-container,
+.dash-layout .split-card,
+.dash-layout .family-card,
+.dash-layout .rule-score-card,
+.dash-layout .spectrum-cat-card,
+.dash-layout .warning-signal-card,
+.dash-layout .rec-card,
+.dash-layout .iv-card,
+.dash-layout .kpi,
+.dash-layout .watchlist-filter-panel,
+.dash-layout .triage-console-panel,
+.dash-layout .ai-copilot-panel,
+.dash-layout .upload-result,
+.dash-layout .cx-card {
+  background: #FFFFFF;
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.dash-layout .stat-card:hover,
+.dash-layout .family-card:hover,
+.dash-layout .cx-card:hover { border-color: var(--slate-300); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06); }
+.dash-layout .cx-item { background: var(--slate-50); border-color: var(--slate-200); }
+.dash-layout .stat-main-number,
+.dash-layout .cx-kpi-value { color: var(--ink-900); }
+.dash-layout .gauge-glow-ambient { display: none; }
+
+/* Forms */
+.dash-layout .form-input,
+.dash-layout .form-select,
+.dash-layout .table-search-input,
+.dash-layout .triage-textarea {
+  background: #FFFFFF; border: 1px solid var(--slate-300); color: var(--ink-900); border-radius: 8px;
+}
+.dash-layout .form-input:focus,
+.dash-layout .form-select:focus,
+.dash-layout .table-search-input:focus,
+.dash-layout .triage-textarea:focus {
+  border-color: var(--ink-900); box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08); outline: none;
+}
+.dash-layout .form-input::placeholder,
+.dash-layout .table-search-input::placeholder { color: var(--slate-400); }
+.dash-layout .form-label { color: var(--slate-600); }
+.dash-layout select option { background: #FFFFFF; color: var(--ink-900); }
+.dash-layout .upload-zone { background: var(--slate-50); border-color: var(--slate-300); }
+.dash-layout .upload-zone:hover { border-color: var(--ink-900); }
+
+/* Tables: slate header row, hairline rows */
+.dash-layout .luxury-data-table th,
+.dash-layout .mon-table th,
+.dash-layout .method-table th,
+.dash-layout .cx-table th {
+  background: var(--slate-50); color: var(--slate-600); border-bottom: 1px solid var(--slate-200);
+}
+.dash-layout .luxury-data-table td,
+.dash-layout .mon-table td,
+.dash-layout .method-table td,
+.dash-layout .cx-table td { border-bottom: 1px solid var(--slate-100); color: var(--slate-600); }
+.dash-layout .table-row-clickable:hover td,
+.dash-layout .cx-table tr.cx-click:hover td { background: var(--slate-50); }
+
+/* Pills and chips: light tinted backgrounds */
+.dash-layout .filter-pill,
+.dash-layout .filter-category-pill,
+.dash-layout .preset-chip,
+.dash-layout .demographic-chip,
+.dash-layout .ws-tab {
+  background: #FFFFFF; border: 1px solid var(--slate-200); color: var(--slate-600);
+}
+.dash-layout .filter-pill.active,
+.dash-layout .filter-category-pill.active,
+.dash-layout .ws-tab.active { background: var(--ink-900); border-color: var(--ink-900); color: #FFFFFF; }
+
+/* Officer chip in the header */
+.dash-layout .header-officer-chip {
+  background: #FFFFFF; border: 1px solid var(--slate-200); box-shadow: var(--shadow-card);
+}
+.dash-layout .officer-avatar { background: var(--ink-900); color: #FFFFFF; }
+.dash-layout .officer-name { color: var(--ink-900); }
+.dash-layout .officer-role { color: var(--slate-500); }
+
+/* Toasts and dialogs opened from these pages */
+.ews-toast { background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12); }
+.cx-dialog { background: #FFFFFF; color: #0F172A; }
+
+/* Panels the dark theme painted with fixed dark colours */
+.dash-layout .kpi,
+.dash-layout .mon-filters,
+.dash-layout .risk-spectrum-panel {
+  background: #FFFFFF; border: 1px solid var(--slate-200); box-shadow: var(--shadow-card);
+}
+.dash-layout .kpi-value,
+.dash-layout .spectrum-title,
+.dash-layout .brand-name,
+.dash-layout .dossier-heading {
+  color: var(--ink-900); -webkit-text-fill-color: currentColor; background: none;
+}
+.dash-layout .spectrum-eyebrow { color: var(--slate-500); }
+.dash-layout .info-tip-body,
+.dash-layout [role="tooltip"] { background: #FFFFFF; color: var(--slate-600); border-color: var(--slate-200); }

@@ -1,0 +1,105 @@
+/* ==========================================================================
+   Agent investigation & governance pages: pills, cards, dialogs, toasts.
+   Uses the design tokens, so it follows whichever theme the page is in.
+   ========================================================================== */
+
+.cx-pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .18rem .6rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 600; letter-spacing: .01em; white-space: nowrap;
+  border: 1px solid var(--cx-tone-border, var(--border-medium));
+  background: var(--cx-tone-bg, transparent); color: var(--cx-tone-fg, var(--text-secondary));
+}
+.cx-tone-neutral  { --cx-tone-bg: rgba(100,116,139,.10); --cx-tone-fg: #64748B; --cx-tone-border: rgba(100,116,139,.25); }
+.cx-tone-info     { --cx-tone-bg: rgba(59,130,246,.10);  --cx-tone-fg: #3B82F6; --cx-tone-border: rgba(59,130,246,.30); }
+.cx-tone-good     { --cx-tone-bg: rgba(22,163,74,.10);   --cx-tone-fg: #16A34A; --cx-tone-border: rgba(22,163,74,.30); }
+.cx-tone-warning  { --cx-tone-bg: rgba(217,119,6,.10);   --cx-tone-fg: #D97706; --cx-tone-border: rgba(217,119,6,.30); }
+.cx-tone-serious  { --cx-tone-bg: rgba(234,88,12,.10);   --cx-tone-fg: #EA580C; --cx-tone-border: rgba(234,88,12,.30); }
+.cx-tone-critical { --cx-tone-bg: rgba(220,38,38,.10);   --cx-tone-fg: #DC2626; --cx-tone-border: rgba(220,38,38,.30); }
+.cx-tone-accent   { --cx-tone-bg: rgba(245,197,24,.12);  --cx-tone-fg: var(--text-accent); --cx-tone-border: var(--border-accent); }
+
+.cx-grid { display: grid; gap: 1rem; }
+.cx-grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cx-grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cx-grid.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .cx-grid.c3, .cx-grid.c4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px)  { .cx-grid.c2, .cx-grid.c3, .cx-grid.c4 { grid-template-columns: 1fr; } }
+
+.cx-card {
+  background: var(--bg-surface); border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; min-width: 0;
+}
+.cx-card h3 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 700; color: var(--text-primary); }
+.cx-card + .cx-card, .cx-section { margin-top: 1rem; }
+.cx-eyebrow {
+  font-family: var(--font-mono); font-size: .68rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: .35rem;
+}
+.cx-kpi .cx-kpi-value { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--text-primary); }
+.cx-kpi .cx-kpi-sub { font-size: .78rem; color: var(--text-muted); margin-top: .2rem; }
+.cx-muted { color: var(--text-muted); font-size: .82rem; }
+.cx-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.cx-row.between { justify-content: space-between; }
+.cx-stack > * + * { margin-top: .65rem; }
+
+.cx-item {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  padding: .8rem .95rem; background: var(--bg-surface-elevated);
+}
+.cx-item-title { font-weight: 650; color: var(--text-primary); font-size: .9rem; }
+.cx-item p { margin: .35rem 0 0; color: var(--text-secondary); font-size: .85rem; line-height: 1.5; }
+
+.cx-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.cx-table th {
+  text-align: left; font-family: var(--font-mono); font-size: .68rem; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-muted); font-weight: 600;
+  padding: .55rem .6rem; border-bottom: 1px solid var(--border-medium);
+}
+.cx-table td { padding: .6rem; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); vertical-align: top; }
+.cx-table tr.cx-click { cursor: pointer; }
+.cx-table tr.cx-click:hover td { background: var(--white-03); }
+.cx-table-wrap { overflow-x: auto; }
+
+.cx-btn-sm { padding: .35rem .75rem !important; font-size: .78rem !important; border-radius: var(--radius-sm) !important; }
+.cx-btn-danger { color: #DC2626 !important; border-color: rgba(220,38,38,.35) !important; }
+
+.cx-tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border-medium); margin: 1.25rem 0 1rem; overflow-x: auto; }
+.cx-tab {
+  background: none; border: 0; border-bottom: 2px solid transparent; padding: .6rem .9rem;
+  color: var(--text-muted); font-weight: 600; font-size: .85rem; cursor: pointer; white-space: nowrap;
+}
+.cx-tab.active { color: var(--text-primary); border-bottom-color: var(--text-accent); }
+.cx-pane[hidden] { display: none; }
+
+.cx-timeline { list-style: none; margin: 0; padding: 0; }
+.cx-timeline li { display: grid; grid-template-columns: 9rem 1fr; gap: .75rem; padding: .45rem 0; border-bottom: 1px dashed var(--border-subtle); font-size: .82rem; }
+.cx-timeline time { color: var(--text-muted); font-family: var(--font-mono); font-size: .74rem; }
+
+.cx-pre {
+  font-family: var(--font-mono); font-size: .75rem; white-space: pre-wrap; word-break: break-word;
+  background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  padding: .6rem .75rem; color: var(--text-secondary); max-height: 18rem; overflow: auto; margin: .4rem 0 0;
+}
+.cx-empty { padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: .88rem; }
+.cx-error { color: #DC2626; font-size: .85rem; }
+
+/* Modal form (credx.ts openForm) */
+.cx-dialog {
+  border: 1px solid var(--border-medium); border-radius: var(--radius-lg); padding: 0;
+  background: var(--bg-surface-elevated); color: var(--text-primary);
+  width: min(32rem, calc(100vw - 2rem)); box-shadow: var(--shadow-float);
+}
+.cx-dialog::backdrop { background: rgba(15, 23, 42, .45); }
+.cx-dialog-form { padding: 1.4rem; }
+.cx-dialog-title { margin: 0 0 .35rem; font-size: 1.1rem; }
+.cx-dialog-desc { margin: 0 0 1rem; color: var(--text-secondary); font-size: .86rem; line-height: 1.5; }
+.cx-dialog-form .form-group { margin-bottom: .85rem; }
+.cx-dialog-error { color: #DC2626; font-size: .84rem; margin: .25rem 0 .75rem; }
+.cx-dialog-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+
+.cx-toast {
+  position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1000; max-width: 24rem;
+  padding: .75rem 1rem; border-radius: var(--radius-md); font-size: .86rem; font-weight: 600;
+  background: var(--bg-surface-elevated); border: 1px solid var(--cx-tone-border); color: var(--cx-tone-fg);
+  box-shadow: var(--shadow-card);
+}

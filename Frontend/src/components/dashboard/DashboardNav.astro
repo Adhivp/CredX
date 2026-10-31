@@ -85,6 +85,57 @@ const { active = "dashboard" } = Astro.props;
         </a>
       </li>
     </ul>
+    <div class="nav-section-title">AI INVESTIGATIONS</div>
+    <ul class="dash-nav-links">
+      <li>
+        <a href="/investigations" class={`nav-item ${active === "investigations" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6M11 8v6"/></svg>
+          </span>
+          <span class="nav-text">Investigations</span>
+          {active === "investigations" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+      <li>
+        <a href="/reviews" class={`nav-item ${active === "reviews" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="4" width="13" height="16" rx="2"/></svg>
+          </span>
+          <span class="nav-text">Review Queue</span>
+          {active === "reviews" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+      <li>
+        <a href="/governed" class={`nav-item ${active === "governed" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6z"/></svg>
+          </span>
+          <span class="nav-text">Governed EWS</span>
+          {active === "governed" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+    </ul>
+    <div class="nav-section-title">GOVERNANCE</div>
+    <ul class="dash-nav-links">
+      <li>
+        <a href="/admin" class={`nav-item ${active === "admin" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7"/><path d="M19 8v6M16 11h6"/></svg>
+          </span>
+          <span class="nav-text">Administration</span>
+          {active === "admin" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+      <li>
+        <a href="/system" class={`nav-item ${active === "system" ? "active" : ""}`}>
+          <span class="nav-icon-wrap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></svg>
+          </span>
+          <span class="nav-text">System & Audit</span>
+          {active === "system" && <span class="active-indicator"></span>}
+        </a>
+      </li>
+    </ul>
     <div class="nav-section-title">DATA</div>
     <ul class="dash-nav-links">
       <li>
