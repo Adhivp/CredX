@@ -18,3 +18,6 @@ class Settings(BaseSettings):
     cors_origins: list[str] = []
     login_max_attempts: int = Field(default=5, ge=1, le=20)
     login_lock_seconds: int = Field(default=900, ge=1)
+    nebius_api_key: str = ""
+    nebius_base_url: str = "https://api.tokenfactory.us-central1.nebius.com/v1/"
+    nebius_model: str = "deepseek-ai/DeepSeek-V4-Flash-0731"
