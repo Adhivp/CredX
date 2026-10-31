@@ -39,9 +39,15 @@ def isolated_app() -> Iterator[FastAPI]:
                 jwt_secret=secrets.token_urlsafe(48),
                 database_url=f"sqlite:///{Path(directory) / 'docs.db'}",
                 nebius_api_key="",
+                llm_enabled=False,
+                investigations_async=False,
             )
             with patch("app.main.Settings", return_value=settings):
                 app = create_app()
+            # The app no longer creates tables at startup; build this disposable schema.
+            from app.db.session import Base
+
+            Base.metadata.create_all(app.state.engine)
             try:
                 yield app
             finally:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.db.session import get_db
+from app.models.user import User
 from app.services.auth import authenticate_access
 
 Database = Annotated[Session, Depends(get_db)]
@@ -28,3 +29,6 @@ def get_current_user(
     credentials: Credentials,
 ):
     return authenticate_access(db, settings, credentials.credentials if credentials else "")
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
