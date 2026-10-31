@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.auth import router
 from app.api.v1.ews import router as ews_router
+from app.api.v1.monitoring import router as monitoring_router
 from app.api.v1.users import router as users_router
 from app.core.config import Settings
 from app.core.http import configure_http
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     import app.models.user  # noqa: F401
     import app.models.auth_session  # noqa: F401
     import app.models.ews  # noqa: F401
+    import app.models.monitoring  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
     @asynccontextmanager
@@ -40,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(ews_router, prefix="/api/v1")
+    app.include_router(monitoring_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:

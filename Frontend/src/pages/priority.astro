@@ -1,0 +1,136 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Priority Queue">
+  <div class="dash-layout">
+    <DashboardNav active="priority" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Risk <span class="gold-gradient-text">Priority Queue</span></h1>
+          <p class="dash-subtitle">
+            Customers ranked by warning severity and financial exposure. Probability of deterioration is shown separately from
+            the impact if it happens. Ranked by expected loss = probability (deterioration model trained on Home Credit) × exposure at default; tiers P1–P4 are natural breaks across the portfolio.
+          </p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <form class="mon-filters" id="filters">
+        <div class="form-group"><label class="form-label" for="sort">Sort by</label>
+          <select id="sort" name="sort" class="form-select">
+            <option value="priority">Priority</option><option value="warning_score">Warning score</option>
+            <option value="exposure">Outstanding exposure</option><option value="expected_loss">Expected loss</option>
+            <option value="probability">Probability of deterioration</option><option value="delinquency">Delinquency (DPD)</option>
+            <option value="trend">Risk trend (3m change)</option><option value="segment">Customer segment</option>
+          </select></div>
+        <div class="form-group"><label class="form-label" for="level">Warning level</label>
+          <select id="level" name="level" class="form-select"><option value="">All</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option><option>Insufficient Data</option></select></div>
+        <div class="form-group"><label class="form-label" for="trend">Trend</label>
+          <select id="trend" name="trend" class="form-select"><option value="">All</option><option value="deteriorating">Deteriorating</option><option value="stable">Stable</option><option value="improving">Improving</option></select></div>
+        <div class="form-group"><label class="form-label" for="delinquency">Delinquency</label>
+          <select id="delinquency" name="delinquency" class="form-select"><option value="">All</option><option value="delinquent">Already delinquent</option><option value="pre_delinquent">Warning before delinquency</option><option value="current">Current</option></select></div>
+        <div class="form-group"><label class="form-label" for="segment">Segment</label><select id="segment" name="segment" class="form-select"><option value="">All</option></select></div>
+        <div class="form-group"><label class="form-label" for="portfolio">Portfolio</label><select id="portfolio" name="portfolio" class="form-select"><option value="">All</option></select></div>
+        <div class="form-group"><label class="form-label" for="product">Product</label><select id="product" name="product" class="form-select"><option value="">All</option></select></div>
+        <input type="hidden" name="quadrant" id="quadrant" />
+        <button type="button" class="btn btn-glass btn-sm" id="resetBtn">Reset</button>
+      </form>
+
+      <div class="mon-grid sidebar">
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Segmentation</span><h3>Probability × impact</h3></div><span class="panel-count-pill" id="tierCounts"></span></div>
+          <div class="quad-axis" style="margin-bottom:0.4rem;">↑ Probability above the training base rate · → Exposure above the portfolio median</div>
+          <div class="quad-grid" id="quads"></div>
+        </div>
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">How to read it</span><h3>Probability vs impact</h3></div></div>
+          <dl class="kv" style="font-size:0.78rem;">
+            <dt>Probability</dt><dd style="font-family:inherit;text-align:left;">P(31+ days past due within 6 months), deterioration model trained on Home Credit; × = multiple of its base rate</dd>
+            <dt>EAD</dt><dd style="font-family:inherit;text-align:left;">Outstanding + CCF × undrawn card / overdraft limit (CCF measured on Home Credit cards before delinquency)</dd>
+            <dt>Expected loss</dt><dd style="font-family:inherit;text-align:left;">Probability × EAD (no recovery data, so no loss-rate assumption)</dd>
+            <dt>Delinquency</dt><dd style="font-family:inherit;text-align:left;">RBI SMA classes: SMA-0 1–30, SMA-1 31–60, SMA-2 61–90 days, NPA &gt; 90</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="dossier-panel mon-panel mon-section">
+        <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Queue</span><h3>Customers requiring attention</h3></div><span class="panel-count-pill" id="count"></span></div>
+        <div class="table-wrap" id="table"><div class="empty-msg">Loading…</div></div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { ewsFetch, esc, inr, pct, levelBadge, trendBadge, tierBadge, dpdBadge, statusBadge, title } from '../lib/ews';
+
+  const form = document.getElementById('filters') as HTMLFormElement;
+  let loadedOptions = false;
+
+  async function loadOptions() {
+    const d = await ewsFetch('/monitoring/dashboard', { query: { window: 2 } });
+    const fill = (id: string, vals: string[], fmt = (v: string) => title(v)) => {
+      (document.getElementById(id) as HTMLSelectElement).innerHTML = '<option value="">All</option>' + vals.map((v) => `<option value="${esc(v)}">${esc(fmt(v))}</option>`).join('');
+    };
+    fill('segment', d.filters.segments, (v) => v); fill('portfolio', d.filters.portfolios); fill('product', d.filters.products);
+    loadedOptions = true;
+  }
+
+  async function load() {
+    const q = Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v !== '')) as Record<string, string>;
+    const table = document.getElementById('table')!;
+    let d: any;
+    try { d = await ewsFetch('/monitoring/priority', { query: q }); }
+    catch (e: any) { table.innerHTML = `<div class="empty-msg">Failed: ${esc(e.message)}</div>`; return; }
+    document.getElementById('count')!.textContent = `${d.total} customers`;
+    document.getElementById('tierCounts')!.textContent = Object.entries(d.tiers).map(([t, n]) => `${t}: ${n}`).join(' · ');
+
+    const order = ['resolve_quickly', 'intervene_now', 'routine', 'protect_exposure'];
+    const labels: Record<string, [string, string]> = {
+      intervene_now: ['Intervene now', 'Likely to deteriorate and a large exposure'],
+      resolve_quickly: ['Resolve quickly', 'Likely to deteriorate, limited exposure'],
+      protect_exposure: ['Protect exposure', 'Lower probability but a large exposure'],
+      routine: ['Routine monitoring', 'Lower probability, limited exposure'],
+    };
+    const active = (document.getElementById('quadrant') as HTMLInputElement).value;
+    document.getElementById('quads')!.innerHTML = order.map((key) => {
+      const s = d.quadrants.find((x: any) => x.key === key) || { count: 0, ead: 0, expected_loss: 0 };
+      return `<button type="button" class="quad ${active === key ? 'active' : ''}" data-q="${key}">
+        <div class="q-title">${labels[key][0]}</div><div class="q-desc">${labels[key][1]}</div>
+        <div class="q-stats">${s.count} customers · EAD ${inr(s.ead)} · EL ${inr(s.expected_loss)}</div></button>`;
+    }).join('');
+    document.querySelectorAll<HTMLButtonElement>('.quad').forEach((b) => b.addEventListener('click', () => {
+      const inp = document.getElementById('quadrant') as HTMLInputElement;
+      inp.value = inp.value === b.dataset.q ? '' : b.dataset.q!;
+      load();
+    }));
+
+    if (!d.items.length) { table.innerHTML = '<div class="empty-msg">No customers match. Run an assessment on the Portfolio Monitor if the queue is empty.</div>'; return; }
+    table.innerHTML = `<table class="mon-table"><thead><tr>
+      <th>#</th><th>Customer</th><th>Priority</th><th>Warning level</th><th class="num">Probability</th>
+      <th class="num">Exposure (EAD)</th><th class="num">Expected loss</th><th>Delinquency</th><th>Trend (3m)</th><th>Recommended next step</th><th>Case</th></tr></thead>
+      <tbody>${d.items.map((i: any, n: number) => `<tr class="clickable" data-href="/workspace/${encodeURIComponent(i.customer_id)}">
+        <td class="mono">${n + 1}</td>
+        <td><span class="cid">${esc(i.customer_id)}</span><span class="sub">${esc(i.segment)} · ${esc(i.portfolio.replace(/_/g, ' '))}</span></td>
+        <td>${tierBadge(i.tier, i.tier_label)}</td>
+        <td>${levelBadge(i.warning_level)} <span class="mono" title="Model score${i.correlation_uplift > 0 ? ' raised by correlated signals' : ''}">${i.effective_score.toFixed(1)}</span>
+          ${i.correlation_uplift > 0 ? `<span class="sub" style="text-transform:none;">model ${i.warning_score.toFixed(1)} +${i.correlation_uplift.toFixed(1)} correlated</span>` : ''}</td>
+        <td class="num">${i.probability_of_deterioration == null ? '–' : pct(i.probability_of_deterioration, 1)}<span class="sub">${i.probability_lift ?? '–'}× base rate</span></td>
+        <td class="num">${inr(i.ead)}<span class="sub">out. ${inr(i.outstanding)}</span></td>
+        <td class="num">${inr(i.expected_loss)}</td>
+        <td>${dpdBadge(i.delinquency)}</td>
+        <td>${trendBadge(i.trend, i.delta_3m)}</td>
+        <td style="max-width:260px;font-size:0.76rem;">${esc(i.top_recommendation || 'Continue monitoring')}${i.recommendation_count > 1 ? `<span class="sub" style="text-transform:none;">+${i.recommendation_count - 1} more</span>` : ''}</td>
+        <td>${i.case ? statusBadge(i.case.status) : '<span class="muted-note">–</span>'}${i.open_interventions ? `<span class="sub" style="text-transform:none;">${i.open_interventions} open action(s)</span>` : ''}</td>
+      </tr>`).join('')}</tbody></table>`;
+    table.querySelectorAll<HTMLElement>('tr[data-href]').forEach((tr) => tr.addEventListener('click', () => { window.location.href = tr.dataset.href!; }));
+  }
+
+  form.addEventListener('change', load);
+  document.getElementById('resetBtn')!.addEventListener('click', () => { form.reset(); (document.getElementById('quadrant') as HTMLInputElement).value = ''; load(); });
+  loadOptions().catch(() => {}).finally(load);
+</script>

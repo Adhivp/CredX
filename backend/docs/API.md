@@ -61,6 +61,25 @@ In Swagger UI, click **Authorize** and paste the access token only. Swagger adds
 | POST | `/api/v1/ews/alert/{assessment_id}` | None | 200 |
 | POST | `/api/v1/ews/explain/{customer_id}` | None | 200 |
 | GET | `/api/v1/ews/portfolio` | None | 200 |
+| POST | `/api/v1/ews/monitoring/history/rebuild` | None | 200 |
+| GET | `/api/v1/ews/monitoring/customer/{customer_id}/trend` | None | 200 |
+| GET | `/api/v1/ews/monitoring/priority` | None | 200 |
+| GET | `/api/v1/ews/monitoring/dashboard` | None | 200 |
+| GET | `/api/v1/ews/workspace/{customer_id}` | None | 200 |
+| POST | `/api/v1/ews/workspace/{customer_id}/briefing` | None | 200 |
+| POST | `/api/v1/ews/cases` | Optional bearer (actor) | 201 |
+| GET | `/api/v1/ews/cases` | None | 200 |
+| PATCH | `/api/v1/ews/cases/{case_id}` | Optional bearer (actor) | 200 |
+| POST | `/api/v1/ews/cases/{case_id}/notes` | Optional bearer (actor) | 201 |
+| POST | `/api/v1/ews/cases/{case_id}/info-requests` | Optional bearer (actor) | 201 |
+| PATCH | `/api/v1/ews/info-requests/{activity_id}` | Optional bearer (actor) | 200 |
+| POST | `/api/v1/ews/cases/{case_id}/classification` | Optional bearer (actor) | 200 |
+| POST | `/api/v1/ews/repayments/{repayment_id}/classification` | Optional bearer (actor) | 200 |
+| DELETE | `/api/v1/ews/repayments/{repayment_id}/classification` | Optional bearer (actor) | 200 |
+| POST | `/api/v1/ews/interventions` | Optional bearer (actor) | 201 |
+| GET | `/api/v1/ews/interventions` | None | 200 |
+| PATCH | `/api/v1/ews/interventions/{iv_id}` | Optional bearer (actor) | 200 |
+| POST | `/api/v1/ews/interventions/{iv_id}/approve` | Access bearer token (not the proposer) | 200 |
 
 ## Endpoint details
 
@@ -614,6 +633,87 @@ uv run ruff check scripts/export_openapi.py tests/test_api_docs.py
 The exporter calls the actual `create_app()` factory and `app.openapi()` with a temporary SQLite database under `TMPDIR` (otherwise `RUNNER_TEMP`, then `~/.cache/credx`), synthetic signing material, an isolated environment, and dotenv disabled. It neither reads `.env` nor uses the tracked database; it disables the external AI key and disposes/removes its database afterward. No live server is required. Use it in a dedicated development process, not inside a concurrently running server.
 
 The test compares the checked-in schema to the current application's `/openapi.json` and verifies that every generated operation has an endpoint section in this guide. Update this reference whenever request validation, error behavior, or authentication lifecycle rules change; schema equality alone cannot verify prose.
+
+
+## Level 2: risk monitoring and interventions
+
+No endpoint below changes a loan, a credit limit or contacts a customer: interventions record human actions, and customer-impacting ones need approval by a second signed-in user.
+
+### POST /api/v1/ews/monitoring/history/rebuild
+
+Replays the assessment pipeline at each of the last 12 month ends on the data known at that date and stores one risk snapshot per customer per month. Optional `customer_id` query. `POST /ews/assess` already calls this.
+
+### GET /api/v1/ews/monitoring/customer/{customer_id}/trend
+
+Risk history (snapshots, oldest first), trend analysis (`improving` / `stable` / `deteriorating`, deltas, indicator drivers, rule and model contribution changes) and multi-signal correlation.
+
+### GET /api/v1/ews/monitoring/priority
+
+Prioritised customer queue. Query: `sort` (priority, warning_score, exposure, expected_loss, probability, delinquency, trend, segment), `product`, `segment`, `portfolio`, `period`, `trend`, `delinquency` (delinquent, pre_delinquent, current), `level`, `tier`, `quadrant`, `limit`. Each item separates `probability_of_deterioration` from impact (`ead`, `loss_if_default`, `expected_loss`).
+
+### GET /api/v1/ews/monitoring/dashboard
+
+Portfolio early-warning dashboard. Query: `product`, `segment`, `portfolio`, `period` (YYYY-MM as-of month), `window` (2-12 months). Returns KPIs, customers and exposure by warning level, delinquent vs pre-delinquent split, DPD trend series, worsening customers, outstanding interventions and breakdowns.
+
+### GET /api/v1/ews/workspace/{customer_id}
+
+Investigation workspace: profile, facilities, latest assessment, trend, correlation, priority, recommendations, case, interventions, activity trail, information requests and repayment events with any analyst classification.
+
+### POST /api/v1/ews/workspace/{customer_id}/briefing
+
+LLM case briefing (Nebius) written only from the computed facts; replies containing numbers not in the facts are rejected and a template briefing is returned (`source`: ai | template).
+
+### POST /api/v1/ews/cases
+
+Open an investigation case. Body: `customer_id`, `owner`, `owner_role` (relationship_manager, risk_analyst, collections, credit_committee), `summary`, `actor`. 409 when a case is already open.
+
+### GET /api/v1/ews/cases
+
+List cases. Query: `status` (a status or `open`), `owner`.
+
+### PATCH /api/v1/ews/cases/{case_id}
+
+Update `status`, `disposition` (pending, accepted, false_positive), `owner`, `owner_role`, with an optional `note`. Closing needs a note and no open interventions. Every change is logged.
+
+### POST /api/v1/ews/cases/{case_id}/notes
+
+Add an investigation note. Body: `body`, `kind` (note, decision, evidence), `actor`.
+
+### POST /api/v1/ews/cases/{case_id}/info-requests
+
+Request additional information. Body: `items` (list), `requested_from`, `due_date`, `message`, `actor`. Moves an open case to `awaiting_information`.
+
+### PATCH /api/v1/ews/info-requests/{activity_id}
+
+Resolve an information request. Body: `status` (open, fulfilled, cancelled), `response`, `actor`.
+
+### POST /api/v1/ews/cases/{case_id}/classification
+
+Correct the warning level. Body: `corrected_category` (Low, Medium, High, Critical, Insufficient Data, or null to clear), `reason`, `actor`. The model score is kept on record.
+
+### POST /api/v1/ews/repayments/{repayment_id}/classification
+
+Classify a repayment event. Body: `classification` (processing_error, bank_holiday, data_error exclude the event from scoring; customer_delay, disputed, confirmed_miss keep it), `reason`, `case_id`, `actor`. The raw record is unchanged; the customer is reassessed and `score_before` / `score_after` returned.
+
+### DELETE /api/v1/ews/repayments/{repayment_id}/classification
+
+Remove an event classification and reassess the customer.
+
+### POST /api/v1/ews/interventions
+
+Accept a recommendation as an intervention. Body: `customer_id`, `scenario` (temporary_missed_instalment, repeated_repayment_delays, declining_cash_flow, increasing_exposure, sustained_high_risk, restructuring_review, insufficient_information), `case_id`, `facility_ref`, `owner`, `owner_role`, `priority`, `target_date`, `notes`, `actor`. Customer-impacting scenarios start as `pending_approval`; others as `planned`.
+
+### GET /api/v1/ews/interventions
+
+List interventions. Query: `status` (a status or `open`), `owner`, `customer_id`, `overdue`.
+
+### PATCH /api/v1/ews/interventions/{iv_id}
+
+Update `status` (planned → initiated / deferred / cancelled; initiated → completed / deferred / escalated; ...), `owner`, `owner_role`, `priority`, `target_date`, `notes`, `decision`, `outcome`, `evidence`. Completing needs an outcome; deferring, cancelling or escalating needs a reason. 409 on an invalid move.
+
+### POST /api/v1/ews/interventions/{iv_id}/approve
+
+Authorised approval of a customer-impacting intervention. Requires an access bearer token for a user other than the proposer. Body: `approve` (bool), `comment`. 401 without a token, 403 for the proposer.
 
 ## Implementation references
 

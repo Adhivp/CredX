@@ -1,0 +1,200 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Portfolio Early Warning Monitor">
+  <div class="dash-layout">
+    <DashboardNav active="portfolio" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Portfolio <span class="gold-gradient-text">Early Warning Monitor</span></h1>
+          <p class="dash-subtitle">
+            Risk condition of the portfolio: warning levels, exposure at elevated risk, emerging delinquency,
+            worsening scores and open interventions. Already-delinquent customers are shown apart from customers showing warning signs before delinquency.
+          </p>
+        </div>
+        <div class="dash-actions">
+          <button id="assessBtn" class="btn btn-gold"><span id="assessText">Run assessment</span></button>
+          <OfficerProfileHeader />
+        </div>
+      </header>
+
+      <form class="mon-filters" id="filters">
+        <div class="form-group"><label class="form-label" for="f-product">Product</label><select id="f-product" class="form-select" name="product"><option value="">All products</option></select></div>
+        <div class="form-group"><label class="form-label" for="f-segment">Customer segment</label><select id="f-segment" class="form-select" name="segment"><option value="">All segments</option></select></div>
+        <div class="form-group"><label class="form-label" for="f-portfolio">Portfolio</label><select id="f-portfolio" class="form-select" name="portfolio"><option value="">All portfolios</option></select></div>
+        <div class="form-group"><label class="form-label" for="f-period">As of month</label><select id="f-period" class="form-select" name="period"><option value="">Latest</option></select></div>
+        <div class="form-group"><label class="form-label" for="f-window">Trend window</label>
+          <select id="f-window" class="form-select" name="window"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select></div>
+        <button type="button" class="btn btn-glass btn-sm" id="resetBtn">Reset</button>
+      </form>
+
+      <div id="content"><div class="loading" style="padding:3rem;text-align:center;">Loading portfolio risk condition…</div></div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { ewsFetch, esc, inr, levelBadge, trendBadge, tierBadge, dpdBadge, statusBadge, title, stackedBuckets,
+           lineChart, bindTooltips, BUCKETS, toast } from '../lib/ews';
+
+  const form = document.getElementById('filters') as HTMLFormElement;
+  const content = document.getElementById('content')!;
+  let optionsLoaded = false;
+
+  function params() {
+    const fd = new FormData(form);
+    return Object.fromEntries([...fd.entries()].filter(([, v]) => v !== '')) as Record<string, string>;
+  }
+
+  function fillSelect(id: string, values: string[], fmt = (v: string) => title(v)) {
+    const sel = document.getElementById(id) as HTMLSelectElement;
+    const first = sel.options[0].outerHTML;
+    sel.innerHTML = first + values.map((v) => `<option value="${esc(v)}">${esc(fmt(v))}</option>`).join('');
+  }
+
+  const kpi = (label: string, value: string, sub = '', cls = '') =>
+    `<div class="kpi ${cls}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></div>`;
+
+  function custLink(i: any, extra = '') {
+    return `<a href="/workspace/${encodeURIComponent(i.customer_id)}"><span><span class="cid mono">${esc(i.customer_id)}</span> ${extra}</span><span class="mono">${inr(i.outstanding)}</span></a>`;
+  }
+
+  async function load() {
+    content.innerHTML = '<div class="loading" style="padding:3rem;text-align:center;">Loading…</div>';
+    let d: any;
+    try {
+      d = await ewsFetch('/monitoring/dashboard', { query: params() });
+    } catch (e: any) {
+      content.innerHTML = `<div class="dossier-panel empty-msg">Failed to load: ${esc(e.message)}</div>`;
+      return;
+    }
+    if (!optionsLoaded) {
+      fillSelect('f-product', d.filters.products);
+      fillSelect('f-segment', d.filters.segments, (v) => v);
+      fillSelect('f-portfolio', d.filters.portfolios);
+      fillSelect('f-period', [...d.filters.periods].reverse(), (v) => v);
+      optionsLoaded = true;
+    }
+    if (!d.customers) {
+      content.innerHTML = `<div class="dossier-panel empty-msg">${esc(d.message || 'No customers match these filters.')}</div>`;
+      return;
+    }
+    const k = d.kpis;
+    const s = d.delinquency_split;
+    const maxLevelExp = Math.max(1, ...d.by_level.map((l: any) => l.exposure));
+
+    content.innerHTML = `
+      <p class="muted-note" style="margin:-0.4rem 0 0.9rem;">As of <strong class="mono">${esc(d.as_of)}</strong> · ${d.customers} customers in view</p>
+      <div class="mon-grid cols-4">
+        ${kpi('Total exposure', inr(k.total_exposure), `${d.customers} customers monitored`)}
+        ${kpi('Exposure at elevated risk', inr(k.elevated_exposure), `${k.elevated_customers} High / Critical customers`, 'alert')}
+        ${kpi('Already delinquent', String(k.delinquent_customers), `${inr(k.delinquent_exposure)} past due exposure`)}
+        ${kpi('Early warning, not yet delinquent', String(k.early_warning_customers), `${inr(k.early_warning_exposure)} exposure`, 'accent')}
+        ${kpi('Worsening scores', String(k.deteriorating_customers), `${k.improving_customers} improving · ${k.correlated_escalations} raised by correlated signals`)}
+        ${kpi('Expected loss', inr(k.expected_loss), 'Σ probability × exposure at default')}
+        ${kpi('Open interventions', String(k.open_interventions), `${k.overdue_interventions} overdue · ${k.pending_approval} awaiting approval`, k.overdue_interventions ? 'alert' : '')}
+        ${kpi('Open cases', String(k.open_cases), 'Investigations in progress')}
+      </div>
+
+      <div class="mon-grid cols-2 mon-section">
+        <div class="split-card delinquent">
+          <h4>Already delinquent</h4>
+          <div class="big">${s.delinquent.customers} <span class="muted-note">customers · ${inr(s.delinquent.exposure)}</span></div>
+          <p class="muted-note">Past due now, or an instalment paid late this month.</p>
+          <ul class="split-list">${s.delinquent.items.slice(0, 8).map((i: any) => `<li>${custLink(i, dpdBadge(i.delinquency))}</li>`).join('') || '<li class="muted-note">None</li>'}</ul>
+        </div>
+        <div class="split-card early">
+          <h4>Warning signs before delinquency</h4>
+          <div class="big">${s.early_warning.customers} <span class="muted-note">customers · ${inr(s.early_warning.exposure)}</span></div>
+          <p class="muted-note">Current on payments, but Medium+ warning level or a worsening trend.</p>
+          <ul class="split-list">${s.early_warning.items.slice(0, 8).map((i: any) => `<li>${custLink(i, levelBadge(i.warning_level))}</li>`).join('') || '<li class="muted-note">None</li>'}</ul>
+        </div>
+      </div>
+
+      <div class="mon-grid cols-2 mon-section">
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Emerging delinquency</span><h3>Customers by days past due, per month</h3></div></div>
+          ${stackedBuckets(d.trend_series)}
+          ${d.newly_delinquent.length ? `<p class="muted-note" style="margin-top:0.5rem;">Newly delinquent in this window: ${d.newly_delinquent.map((c: string) => `<a class="cid mono" href="/workspace/${encodeURIComponent(c)}">${esc(c)}</a>`).join(', ')}</p>` : ''}
+          <details class="table-view"><summary>Table view</summary>
+            <table class="mon-table"><thead><tr><th>Month</th>${BUCKETS.map((b) => `<th class="num">${b}</th>`).join('')}</tr></thead>
+            <tbody>${d.trend_series.map((p: any) => `<tr><td class="mono">${p.period}</td>${BUCKETS.map((b) => `<td class="num">${p.buckets[b] || 0}</td>`).join('')}</tr>`).join('')}</tbody></table>
+          </details>
+        </div>
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Portfolio score</span><h3>Average warning score</h3></div></div>
+          ${lineChart(d.trend_series.map((p: any) => ({ label: p.period.slice(2), value: p.avg_score,
+            tip: `${p.period}: avg ${p.avg_score ?? '–'} · ${p.elevated} High/Critical (${inr(p.elevated_exposure)}) · ${p.deteriorating} deteriorating` })), { height: 220 })}
+          <details class="table-view"><summary>Table view</summary>
+            <table class="mon-table"><thead><tr><th>Month</th><th class="num">Avg score</th><th class="num">High / Critical</th><th class="num">Elevated exposure</th><th class="num">Deteriorating</th></tr></thead>
+            <tbody>${d.trend_series.map((p: any) => `<tr><td class="mono">${p.period}</td><td class="num">${p.avg_score ?? '–'}</td><td class="num">${p.elevated}</td><td class="num">${inr(p.elevated_exposure)}</td><td class="num">${p.deteriorating}</td></tr>`).join('')}</tbody></table>
+          </details>
+        </div>
+      </div>
+
+      <div class="dossier-panel mon-panel mon-section">
+        <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Warning categories</span><h3>Customers and exposure by warning level</h3></div></div>
+        <div class="table-wrap"><table class="mon-table">
+          <thead><tr><th>Warning level</th><th class="num">Customers</th><th>Exposure</th><th class="num">Delinquent</th><th class="num">Early warning</th><th class="num">Expected loss</th></tr></thead>
+          <tbody>${d.by_level.map((l: any) => `<tr>
+            <td>${levelBadge(l.level)}</td><td class="num">${l.customers}</td>
+            <td><div class="meter-row" style="grid-template-columns:1fr 90px;margin:0;"><div class="meter-track"><div class="meter-fill" style="width:${(l.exposure / maxLevelExp) * 100}%"></div></div><span class="mono" style="text-align:right;">${inr(l.exposure)}</span></div></td>
+            <td class="num">${l.delinquent}</td><td class="num">${l.early_warning}</td><td class="num">${inr(l.expected_loss)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="mon-grid cols-2 mon-section">
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Risk trend</span><h3>Customers with worsening scores</h3></div></div>
+          ${d.worsening.length ? `<div class="table-wrap"><table class="mon-table"><thead><tr><th>Customer</th><th>Trend (3m)</th><th>Level</th><th class="num">Exposure</th><th>Priority</th></tr></thead><tbody>
+            ${d.worsening.map((i: any) => `<tr class="clickable" data-href="/workspace/${encodeURIComponent(i.customer_id)}">
+              <td><span class="cid">${esc(i.customer_id)}</span><span class="sub">${esc(i.segment)}</span></td>
+              <td>${trendBadge(i.trend, i.delta_3m)}</td><td>${levelBadge(i.warning_level)}</td>
+              <td class="num">${inr(i.outstanding)}</td><td>${tierBadge(i.tier, i.tier_label)}</td></tr>`).join('')}
+          </tbody></table></div>` : '<p class="muted-note">No customer is deteriorating in this selection.</p>'}
+        </div>
+        <div class="dossier-panel mon-panel">
+          <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Actions</span><h3>Outstanding interventions</h3></div>
+            <a href="/interventions" class="btn btn-glass btn-sm">All interventions →</a></div>
+          ${d.interventions.length ? `<div class="table-wrap"><table class="mon-table"><thead><tr><th>Ref</th><th>Customer</th><th>Action</th><th>Status</th><th>Due</th></tr></thead><tbody>
+            ${d.interventions.map((i: any) => `<tr class="clickable" data-href="/workspace/${encodeURIComponent(i.customer_id)}">
+              <td class="mono">${esc(i.reference)}</td><td class="cid">${esc(i.customer_id)}</td>
+              <td>${esc(i.scenario_label)}<span class="sub">${esc(i.owner)}</span></td><td>${statusBadge(i.status)}</td>
+              <td class="mono" style="${i.overdue ? 'color:#FCA5A5' : ''}">${esc(i.target_date)}${i.overdue ? ' · overdue' : ''}</td></tr>`).join('')}
+          </tbody></table></div>` : '<p class="muted-note">No open interventions. Accept a recommendation in a customer workspace to create one.</p>'}
+        </div>
+      </div>
+
+      <div class="mon-grid cols-3 mon-section">
+        ${['portfolio', 'segment', 'product'].map((dim) => `
+          <div class="dossier-panel mon-panel">
+            <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Breakdown</span><h3>By ${dim}</h3></div></div>
+            <table class="mon-table"><thead><tr><th>${title(dim)}</th><th class="num">Cust.</th><th class="num">Elevated</th><th class="num">Delinq.</th><th class="num">Early</th></tr></thead>
+            <tbody>${d.breakdown[dim].map((g: any) => `<tr><td style="text-transform:capitalize;">${esc(String(g.name).replace(/_/g, ' '))}</td><td class="num">${g.customers}</td><td class="num">${g.elevated}</td><td class="num">${g.delinquent}</td><td class="num">${g.early_warning}</td></tr>`).join('')}</tbody></table>
+          </div>`).join('')}
+      </div>`;
+
+    content.querySelectorAll<HTMLElement>('tr[data-href]').forEach((tr) => tr.addEventListener('click', () => { window.location.href = tr.dataset.href!; }));
+    bindTooltips(content);
+  }
+
+  form.addEventListener('change', load);
+  document.getElementById('resetBtn')!.addEventListener('click', () => { form.reset(); load(); });
+  document.getElementById('assessBtn')!.addEventListener('click', async () => {
+    const btn = document.getElementById('assessBtn') as HTMLButtonElement;
+    const txt = document.getElementById('assessText')!;
+    btn.disabled = true; txt.textContent = 'Assessing + rebuilding history…';
+    try {
+      const r = await ewsFetch('/assess', { method: 'POST' });
+      toast(`Assessed ${r.total_assessed} customers · ${r.history.snapshots} monthly snapshots`);
+      optionsLoaded = false;
+      await load();
+    } catch (e: any) { toast(e.message, 'err'); }
+    btn.disabled = false; txt.textContent = 'Run assessment';
+  });
+  load();
+</script>

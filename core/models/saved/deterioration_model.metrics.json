@@ -1,0 +1,13 @@
+{
+  "dataset": "Home Credit, first 3,000,000 instalment rows + 1,500,000 card rows (sampled for speed)",
+  "customers": 62712,
+  "target": "instalment > 30 days past due within 180 days (RBI SMA-1)",
+  "base_rate": 0.0078,
+  "test_auc": 0.7726,
+  "trend_cuts_logodds": [
+    0.6494,
+    1.4153
+  ],
+  "ccf_undrawn": 0.0563,
+  "ccf_cards": 1971
+}

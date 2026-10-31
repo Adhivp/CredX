@@ -1,0 +1,80 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+---
+
+<Layout title="CredX — Interventions">
+  <div class="dash-layout">
+    <DashboardNav active="interventions" />
+    <main class="dash-main">
+      <header class="dash-header">
+        <div class="header-titles">
+          <h1 class="dash-title">Intervention <span class="gold-gradient-text">Tracking</span></h1>
+          <p class="dash-subtitle">Every accepted warning that needs action, with its owner, priority, target date, status and outcome.
+            Customer-impacting actions wait for approval by a second signed-in user.</p>
+        </div>
+        <div class="dash-actions"><OfficerProfileHeader /></div>
+      </header>
+
+      <form class="mon-filters" id="filters">
+        <div class="form-group"><label class="form-label" for="status">Status</label>
+          <select id="status" name="status" class="form-select">
+            <option value="open">All open</option><option value="">All</option><option value="planned">Planned</option>
+            <option value="pending_approval">Pending approval</option><option value="approved">Approved</option><option value="initiated">Initiated</option>
+            <option value="deferred">Deferred</option><option value="escalated">Escalated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+          </select></div>
+        <div class="form-group"><label class="form-label" for="owner">Owner</label><input id="owner" name="owner" class="form-input" placeholder="Any owner" /></div>
+        <div class="form-group"><label class="form-label" for="overdue">Due</label>
+          <select id="overdue" name="overdue" class="form-select"><option value="">Any</option><option value="true">Overdue only</option></select></div>
+      </form>
+
+      <div class="mon-grid cols-4" id="kpis"></div>
+      <div class="dossier-panel mon-panel mon-section">
+        <div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">Register</span><h3>Interventions</h3></div><span class="panel-count-pill" id="count"></span></div>
+        <div class="table-wrap" id="table"><div class="empty-msg">Loading…</div></div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { ewsFetch, esc, statusBadge, tierBadge, title, fmtDate } from '../lib/ews';
+
+  const form = document.getElementById('filters') as HTMLFormElement;
+
+  async function load() {
+    const q = Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v !== '')) as Record<string, string>;
+    const table = document.getElementById('table')!;
+    let d: any;
+    try { d = await ewsFetch('/interventions', { query: q }); }
+    catch (e: any) { table.innerHTML = `<div class="empty-msg">Failed: ${esc(e.message)}</div>`; return; }
+    const s = d.by_status;
+    const kpi = (l: string, v: number, sub = '', cls = '') => `<div class="kpi ${cls}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div><div class="kpi-sub">${sub}</div></div>`;
+    document.getElementById('kpis')!.innerHTML =
+      kpi('In view', d.total, 'Interventions matching the filters') +
+      kpi('Awaiting approval', s.pending_approval || 0, 'Customer-impacting', s.pending_approval ? 'accent' : '') +
+      kpi('In progress', (s.initiated || 0) + (s.approved || 0) + (s.planned || 0), `${s.escalated || 0} escalated · ${s.deferred || 0} deferred`) +
+      kpi('Overdue', d.overdue, 'Past target date, still open', d.overdue ? 'alert' : '');
+    document.getElementById('count')!.textContent = `${d.total} records`;
+    if (!d.items.length) { table.innerHTML = '<div class="empty-msg">No interventions match. Open a customer from the Priority Queue and accept a recommendation.</div>'; return; }
+    table.innerHTML = `<table class="mon-table"><thead><tr><th>Ref</th><th>Customer / facility</th><th>Warning</th><th>Recommended intervention</th>
+      <th>Owner</th><th>Priority</th><th>Target</th><th>Status</th><th>Outcome / decision</th></tr></thead><tbody>
+      ${d.items.map((i: any) => `<tr class="clickable" data-href="/workspace/${encodeURIComponent(i.customer_id)}">
+        <td class="mono">${esc(i.reference)}<span class="sub">${fmtDate(i.created_at)}</span></td>
+        <td><span class="cid">${esc(i.customer_id)}</span><span class="sub mono">${esc(i.facility_ref)}</span></td>
+        <td>${esc(i.warning_category)}<span class="sub" style="text-transform:none;">${esc(i.scenario_label)}</span></td>
+        <td style="max-width:260px;">${esc(i.recommended_action)}${i.customer_impacting ? '<span class="sub" style="color:#FCD34D;text-transform:none;">Customer-impacting · approval required</span>' : ''}</td>
+        <td>${esc(i.owner)}<span class="sub">${esc(title(i.owner_role))}</span></td>
+        <td>${tierBadge(i.priority)}</td>
+        <td class="mono" style="${i.overdue ? 'color:#FCA5A5' : ''}">${esc(i.target_date)}${i.overdue ? '<span class="sub">overdue</span>' : ''}</td>
+        <td>${statusBadge(i.status)}${i.approved_by ? `<span class="sub" style="text-transform:none;">by ${esc(i.approved_by)}</span>` : ''}</td>
+        <td style="max-width:240px;font-size:0.74rem;color:var(--white-75);">${esc(i.outcome || i.decision || '–')}</td></tr>`).join('')}
+      </tbody></table>`;
+    table.querySelectorAll<HTMLElement>('tr[data-href]').forEach((tr) => tr.addEventListener('click', () => { window.location.href = tr.dataset.href!; }));
+  }
+
+  form.addEventListener('change', load);
+  form.addEventListener('submit', (e) => { e.preventDefault(); load(); });
+  load();
+</script>

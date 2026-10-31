@@ -202,6 +202,7 @@ const { id } = Astro.params;
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             Back to Watchlist
           </a>
+          <a href="/workspace/${encodeURIComponent(cid)}" class="btn btn-gold" title="Open the Level 2 investigation workspace">Investigate →</a>
           <button id="copyIdBtn" class="btn btn-glass" title="Copy Customer ID">
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
             <span id="copyIdText">Copy ID</span>

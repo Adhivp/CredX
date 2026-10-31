@@ -1,0 +1,338 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import OfficerProfileHeader from "../../components/dashboard/OfficerProfileHeader.astro";
+const { id } = Astro.params;
+---
+
+<Layout title={`CredX — Investigation ${id}`}>
+  <div class="dash-layout">
+    <DashboardNav active="priority" />
+    <main class="dash-main" data-customer={id}>
+      <div class="dossier-breadcrumbs">
+        <a href="/priority" class="breadcrumb-link">Priority Queue</a><span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">Investigation workspace</span>
+        <span style="margin-left:auto;"><OfficerProfileHeader /></span>
+      </div>
+      <div id="ws"><div class="empty-msg">Loading investigation workspace…</div></div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  import { ewsFetch, esc, inr, pct, levelBadge, trendBadge, tierBadge, dpdBadge, statusBadge, title, fmtDate,
+           fmtDateTime, lineChart, bindTooltips, toast, actorName } from '../../lib/ews';
+
+  const cid = (document.querySelector('main') as HTMLElement).dataset.customer!;
+  const root = document.getElementById('ws')!;
+  let W: any = null;
+  let activeTab = 'overview';
+  const ROLES = ['relationship_manager', 'risk_analyst', 'collections', 'credit_committee'];
+  const CASE_STATUSES = ['open', 'under_investigation', 'awaiting_information', 'action_in_progress', 'monitoring', 'closed'];
+  const NEXT: Record<string, string[]> = {
+    planned: ['initiated', 'deferred', 'cancelled'], approved: ['initiated', 'deferred', 'cancelled'],
+    initiated: ['completed', 'deferred', 'escalated'], deferred: ['initiated', 'escalated', 'cancelled'],
+    escalated: ['initiated', 'completed'], pending_approval: [], completed: [], cancelled: [],
+  };
+
+  const opts = (vals: string[], sel = '') => vals.map((v) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${title(v)}</option>`).join('');
+  const panel = (eyebrow: string, h: string, body: string, extra = '') =>
+    `<div class="dossier-panel mon-panel"><div class="panel-header-row"><div class="panel-title-group"><span class="panel-eyebrow">${eyebrow}</span><h3>${h}</h3></div>${extra}</div>${body}</div>`;
+
+  async function load() {
+    try { W = await ewsFetch(`/workspace/${encodeURIComponent(cid)}`); }
+    catch (e: any) { root.innerHTML = `<div class="dossier-panel empty-msg">${esc(e.message)} <br/><a class="btn btn-glass btn-sm" href="/priority">Back</a></div>`; return; }
+    render();
+  }
+
+  function render() {
+    const a = W.analysis, c = W.customer, p = a?.priority, t = a?.trend;
+    const tabs = [['overview', 'Overview & recommendations'], ['trend', 'Historical trend'], ['events', `Repayment events (${W.repayments.length})`],
+      ['case', 'Case, notes & requests'], ['interventions', `Interventions (${W.interventions.length})`]];
+    root.innerHTML = `
+      <div class="ws-header">
+        <div>
+          <div class="ws-id">${esc(c.customer_id)}</div>
+          <h1 class="ws-title">Early warning investigation</h1>
+          <div class="ws-tags">
+            ${p ? levelBadge(p.warning_level) : ''} ${p ? tierBadge(p.tier, p.tier_label) : ''} ${t ? trendBadge(t.direction, t.delta_3m) : ''}
+            ${p ? dpdBadge(p.delinquency) : ''} ${W.case ? statusBadge(W.case.status) + ` <span class="mono muted-note">${esc(W.case.reference)}</span>` : '<span class="muted-note">No case open</span>'}
+            ${W.case?.corrected_category ? `<span class="status-pill st-warn">Analyst-corrected</span>` : ''}
+          </div>
+          <p class="muted-note" style="margin-top:0.4rem;text-transform:capitalize;">${esc(c.segment)} · ${esc((c.portfolio || '').replace(/_/g, ' '))} · ${c.products.map((x: string) => esc(x.replace(/_/g, ' '))).join(', ')}</p>
+        </div>
+        <div class="ws-score">
+          <div class="val">${p ? p.effective_score.toFixed(1) : '–'}</div>
+          <div class="lbl">Warning score${a?.correlation?.uplift > 0 ? ` (model ${a.correlation.base_score.toFixed(1)} + ${a.correlation.uplift.toFixed(1)} correlated)` : ''}</div>
+          <div class="lbl">${p ? esc(p.quadrant.label) : ''}</div>
+        </div>
+      </div>
+      ${a ? '' : '<div class="dossier-panel empty-msg">No risk history yet: run an assessment on the Portfolio Monitor.</div>'}
+      <div class="ws-tabs" role="tablist">${tabs.map(([k, l]) => `<button class="ws-tab ${k === activeTab ? 'active' : ''}" data-tab="${k}" role="tab">${l}</button>`).join('')}</div>
+      <section class="ws-pane" data-pane="overview" ${activeTab !== 'overview' ? 'hidden' : ''}>${a ? overview() : ''}</section>
+      <section class="ws-pane" data-pane="trend" ${activeTab !== 'trend' ? 'hidden' : ''}>${a ? trendPane() : ''}</section>
+      <section class="ws-pane" data-pane="events" ${activeTab !== 'events' ? 'hidden' : ''}>${eventsPane()}</section>
+      <section class="ws-pane" data-pane="case" ${activeTab !== 'case' ? 'hidden' : ''}>${casePane()}</section>
+      <section class="ws-pane" data-pane="interventions" ${activeTab !== 'interventions' ? 'hidden' : ''}>${ivPane()}</section>`;
+    root.querySelectorAll<HTMLButtonElement>('.ws-tab').forEach((b) => b.addEventListener('click', () => {
+      activeTab = b.dataset.tab!;
+      root.querySelectorAll('.ws-tab').forEach((x) => x.classList.toggle('active', x === b));
+      root.querySelectorAll<HTMLElement>('.ws-pane').forEach((x) => { x.hidden = x.dataset.pane !== activeTab; });
+    }));
+    bind();
+    bindTooltips(root);
+  }
+
+  // ── Overview: profile, facilities, correlation, recommendations
+  function overview() {
+    const a = W.analysis, p = a.priority, corr = a.correlation;
+    const fac = W.facilities.map((f: any) => `<tr><td style="text-transform:capitalize;">${esc((f.facility_type || '').replace(/_/g, ' '))}${f.loan_id ? `<span class="sub mono">${esc(f.loan_id)}</span>` : ''}</td>
+      <td class="num">${inr(f.sanctioned_amount)}</td><td class="num">${inr(f.outstanding_balance)}</td>
+      <td class="num">${f.credit_limit ? pct(f.outstanding_balance / f.credit_limit) : pct(f.sanctioned_amount ? f.outstanding_balance / f.sanctioned_amount : null)}</td>
+      <td class="num">${inr(f.instalment_amount)}</td></tr>`).join('');
+    const fams = corr.families.map((f: any) => `<div class="family-card ${f.raises_risk && f.worsening ? 'worsening' : ''}">
+      <div class="f-head"><strong style="font-size:0.84rem;">${esc(f.label)}</strong><span class="f-score">${f.effect >= 0 ? '+' : ''}${f.effect.toFixed(2)}</span></div>
+      <div class="muted-note">log-odds effect (3 months ago ${f.effect_reference >= 0 ? '+' : ''}${f.effect_reference.toFixed(2)})</div>
+      <div style="margin-top:0.3rem;"><span class="status-pill ${f.raises_risk ? 'st-bad' : 'st-good'}">${f.raises_risk ? 'Raises risk' : 'Lowers risk'}</span>
+      ${f.worsening ? '<span class="status-pill st-warn">Worsening</span>' : ''}</div></div>`).join('') +
+      corr.interactions.map((i: any) => `<div class="family-card"><div class="f-head"><strong style="font-size:0.8rem;">Together: ${i.labels.map(esc).join(' + ')}</strong><span class="f-score">${i.effect >= 0 ? '+' : ''}${i.effect.toFixed(2)}</span></div><div class="muted-note">combined effect learned by the model</div></div>`).join('');
+    const dedup = corr.deduplicated.map((d: any) => `<div class="dedup-item"><strong>${esc(d.event)}</strong>, seen by ${d.seen_by.map(esc).join(', ')} → counted as ${esc(d.counted_as)}</div>`).join('');
+    const recs = a.recommendations.map((r: any, i: number) => {
+      const existing = W.interventions.find((iv: any) => iv.scenario === r.scenario && !['completed', 'cancelled'].includes(iv.status));
+      return `<div class="rec-card">
+        <div class="r-head"><div><div class="r-scn">${esc(r.scenario_label)}</div><div class="r-action">${esc(r.action)}</div></div>${tierBadge(r.priority)}</div>
+        <div style="font-size:0.78rem;color:var(--white-75);">${esc(r.rationale)}</div>
+        <ul>${r.evidence.map((e: string) => `<li>${esc(e)}</li>`).join('')}</ul>
+        <div class="muted-note">Owner: ${title(r.owner_role)} · target ${r.target_days} days</div>
+        ${r.requires_approval ? '<div class="r-guard">⚠ Customer-impacting: needs approval by a second signed-in user before it can start. The system never changes loans or limits itself.</div>' : ''}
+        ${existing ? `<div class="muted-note">Already tracked as <span class="mono">${esc(existing.reference)}</span> (${title(existing.status)})</div>`
+          : `<div><button class="btn btn-gold btn-sm btn-xs" data-accept="${i}">Accept → create intervention</button></div>`}
+      </div>`;
+    }).join('') || '<p class="muted-note">No intervention recommended: continue routine monitoring.</p>';
+    return `
+      <div class="mon-grid cols-4">
+        <div class="kpi"><div class="kpi-label">Probability of deterioration</div><div class="kpi-value">${p.probability_of_deterioration == null ? '–' : pct(p.probability_of_deterioration, 1)}</div><div class="kpi-sub">31+ DPD within 6 months · ${p.probability_lift ?? '–'}× base rate ${pct(p.base_rate, 2)}</div></div>
+        <div class="kpi"><div class="kpi-label">Exposure at default</div><div class="kpi-value">${inr(p.exposure.ead)}</div><div class="kpi-sub">Outstanding ${inr(p.exposure.outstanding)} + ${pct(p.exposure.ccf, 1)} CCF × undrawn ${inr(p.exposure.undrawn)}</div></div>
+        <div class="kpi"><div class="kpi-label">Expected loss</div><div class="kpi-value">${inr(p.expected_loss)}</div><div class="kpi-sub">Probability × exposure at default · tier ${esc(p.tier)}</div></div>
+        <div class="kpi"><div class="kpi-label">Delinquency</div><div class="kpi-value">${esc(p.delinquency.bucket)}</div><div class="kpi-sub">${p.delinquency.dpd} days past due (RBI SMA class)</div></div>
+      </div>
+      <div class="mon-grid sidebar mon-section">
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+          ${panel('AI case briefing', 'Grounded in the computed facts', `<div id="briefing" class="explain-box">Click to generate a briefing. Every number is checked against the data; otherwise a template is shown.</div><button class="btn btn-glass btn-sm" style="margin-top:0.6rem;" id="briefBtn">Generate briefing</button>`)}
+          ${panel('Multi-signal correlation', 'Why the warning level is what it is', `
+            <div class="explain-box">${esc(corr.explanation)}</div>
+            <div class="mon-grid cols-3" style="margin-top:0.9rem;">${fams}</div>
+            ${dedup ? `<div style="margin-top:0.8rem;"><div class="panel-eyebrow">Not double-counted</div>${dedup}</div>` : ''}`)}
+          ${panel('Recommended interventions', 'Preventive actions supported by the indicators', `<div class="mon-grid cols-2">${recs}</div>`)}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+          ${panel('Profile', 'Customer & assessment', `<dl class="kv">
+            <dt>Customer type</dt><dd>${esc(W.customer.customer_type)}</dd><dt>Employment</dt><dd>${esc(W.customer.employment_category)}</dd>
+            <dt>Portfolio</dt><dd>${esc(W.customer.portfolio)}</dd><dt>Model warning score</dt><dd>${W.assessment ? W.assessment.warning_score.toFixed(1) + ' · ' + esc(W.assessment.risk_category) : '–'}</dd>
+            <dt>Assessed</dt><dd>${W.assessment ? fmtDateTime(W.assessment.assessed_at) : '–'}</dd><dt>History</dt><dd>${a.history.length} months</dd></dl>`)}
+          ${panel('Facilities', `Credit facilities (${W.facilities.length})`, `<div class="table-wrap"><table class="mon-table"><thead><tr><th>Facility</th><th class="num">Sanctioned</th><th class="num">Outstanding</th><th class="num">Util.</th><th class="num">Instalment</th></tr></thead><tbody>${fac}</tbody></table></div>`)}
+          ${panel('Supporting evidence', 'Latest indicators', `<ul style="margin:0;padding-left:1rem;font-size:0.78rem;color:var(--white-75);display:flex;flex-direction:column;gap:0.3rem;">${(W.assessment?.top_indicators || []).map((x: string) => `<li>${esc(x)}</li>`).join('')}</ul>`)}
+        </div>
+      </div>`;
+  }
+
+  // ── Trend pane
+  function trendPane() {
+    const a = W.analysis, t = a.trend, h = a.history;
+    const chart = lineChart((t.series || []).map((x: any) => ({ label: x.period.slice(2), value: x.p * 100, tip: `${x.period}: ${(x.p * 100).toFixed(1)}% chance of 31+ DPD within 6 months` })), { height: 230, max: Math.max(5, Math.ceil(Math.max(...(t.series || []).map((x: any) => x.p * 100), 1) * 1.2)), bands: false });
+    const drivers = (t.drivers || []).map((d: any) => `<div class="driver-row"><span>${esc(d.label)}<span class="sub">${esc(d.family)}</span></span>
+        <span class="mono">${d.before ?? '–'} → ${d.after ?? '–'}</span><span class="${d.direction === 'worsening' ? 'worse' : 'better'}">${d.contribution_change > 0 ? '+' : ''}${d.contribution_change.toFixed(2)}</span></div>`).join('') || '<p class="muted-note">No change in model contributions.</p>';
+    const comps = '', model = '';
+    const rows = [...h].reverse().map((s: any) => `<tr><td class="mono">${s.period}</td><td class="num">${s.warning_score.toFixed(1)}</td><td>${levelBadge(s.risk_category)}</td>
+      <td class="num">${s.scores.delay.toFixed(0)}</td><td class="num">${s.scores.miss.toFixed(0)}</td><td class="num">${s.scores.exposure.toFixed(0)}</td><td class="num">${s.scores.cashflow.toFixed(0)}</td>
+      <td class="num">${s.metrics.late_6m ?? '–'}</td><td class="num">${s.metrics.current_dpd ?? 0}</td><td class="num">${s.metrics.avg_inflow_3m ? inr(s.metrics.avg_inflow_3m) : '–'}</td>
+      <td class="num">${pct(s.metrics.revolving_utilisation)}</td><td class="num">${s.metrics.total_outstanding != null ? inr(s.metrics.total_outstanding) : '–'}</td>
+      <td style="font-size:0.7rem;color:var(--white-40);">${(s.data_notes || []).map(esc).join('; ')}</td></tr>`).join('');
+    return `
+      <div class="mon-grid sidebar">
+        ${panel('Historical risk trend', 'Probability of deterioration (%) by month end', `${chart}<div class="explain-box" style="margin-top:0.8rem;">${trendBadge(t.direction, t.delta_3m)} ${esc(t.summary || '')}</div>`)}
+        ${panel('What moved the probability', `${esc(t.reference_period || '')} → ${esc(t.latest_period || '')} · SHAP change (log-odds)`, `<p class="muted-note">Direction cut points learned from Home Credit: ${(t.learned_cuts || []).join(' / ')} log-odds over 3 months.</p>${drivers}${comps ? `<div class="panel-eyebrow" style="margin-top:0.8rem;">Signal scores</div>${comps}` : ''}${model ? `<div class="panel-eyebrow" style="margin-top:0.8rem;">Model contributions</div>${model}` : ''}`)}
+      </div>
+      <div class="mon-section">${panel('Indicator history', 'Each month replayed on the data known at that date', `<div class="table-wrap"><table class="mon-table"><thead><tr>
+        <th>Month</th><th class="num">Score</th><th>Level</th><th class="num">Delay</th><th class="num">Miss</th><th class="num">Exposure</th><th class="num">Cash flow</th>
+        <th class="num">Late 6m</th><th class="num">DPD</th><th class="num">Inflow 3m</th><th class="num">Card util.</th><th class="num">Outstanding</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>`)}</div>`;
+  }
+
+  // ── Repayment events with reclassification
+  function eventsPane() {
+    const rows = W.repayments.map((r: any) => {
+      const late = r.dpd > 0 || r.repayment_status !== 'on_time';
+      const cl = r.classification;
+      return `<tr>
+        <td class="mono">${esc(r.loan_id)}</td><td class="mono">${esc(r.due_date)}</td><td class="mono">${esc(r.payment_date || 'unpaid')}</td>
+        <td class="num">${inr(r.amount_due)}</td><td class="num">${inr(r.amount_paid)}</td><td class="num">${r.dpd}</td><td>${esc(title(r.repayment_status))}</td>
+        <td>${cl ? `<span class="status-pill ${cl.excluded_from_scoring ? 'st-good' : 'st-neutral'}">${esc(title(cl.classification))}</span>
+            <span class="sub" style="text-transform:none;">${esc(cl.reason)} · score ${cl.score_before ?? '–'} → ${cl.score_after ?? '–'}</span>
+            <button class="btn btn-glass btn-xs" data-unclassify="${r.id}">Undo</button>`
+          : late ? `<button class="btn btn-glass btn-xs" data-classify="${r.id}">Classify event…</button>` : ''}</td></tr>`;
+    }).join('');
+    return panel('Repayment events', 'Instalments and analyst classification', `
+      <p class="muted-note" style="margin-bottom:0.6rem;">If a miss was caused by a processing issue (failed auto-debit, bank holiday, data error), classify it: the original record is kept, the event is excluded from scoring, and the risk assessment and history are recalculated.</p>
+      <div id="classifyForm"></div>
+      <div class="table-wrap"><table class="mon-table"><thead><tr><th>Loan</th><th>Due</th><th>Paid</th><th class="num">Due amt</th><th class="num">Paid amt</th><th class="num">DPD</th><th>Status</th><th>Classification</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted-note">No repayments</td></tr>'}</tbody></table></div>`);
+  }
+
+  // ── Case pane
+  function casePane() {
+    const cs = W.case;
+    const open = cs && cs.status !== 'closed';
+    const caseBox = !cs || cs.status === 'closed' ? `
+      <form class="ws-form" id="openCase">
+        <div class="row"><div><label>Owner</label><input name="owner" value="${esc(actorName())}"/></div>
+        <div><label>Owner role</label><select name="owner_role">${opts(ROLES, 'risk_analyst')}</select></div></div>
+        <div><label>Summary</label><textarea name="summary" placeholder="Why is this warning being investigated?"></textarea></div>
+        <button class="btn btn-gold btn-sm" type="submit">Open investigation case</button></form>`
+      : `<dl class="kv"><dt>Reference</dt><dd>${esc(cs.reference)}</dd><dt>Opened</dt><dd>${fmtDateTime(cs.created_at)} by ${esc(cs.created_by)}</dd>
+          <dt>At open</dt><dd>${esc(cs.category_at_open)} · ${cs.score_at_open.toFixed(1)} · ${esc(cs.priority_tier)}</dd>
+          <dt>Disposition</dt><dd>${esc(title(cs.disposition))}</dd>
+          ${cs.corrected_category ? `<dt>Corrected level</dt><dd>${esc(cs.corrected_category)}</dd>` : ''}</dl>
+        <form class="ws-form" id="updateCase" style="margin-top:0.8rem;">
+          <div class="row"><div><label>Status</label><select name="status">${opts(CASE_STATUSES, cs.status)}</select></div>
+          <div><label>Warning disposition</label><select name="disposition">${opts(['pending', 'accepted', 'false_positive'], cs.disposition)}</select></div></div>
+          <div class="row"><div><label>Owner</label><input name="owner" value="${esc(cs.owner)}"/></div><div><label>Owner role</label><select name="owner_role">${opts(ROLES, cs.owner_role)}</select></div></div>
+          <div><label>Note (required to close)</label><input name="note" placeholder="Reason for the change"/></div>
+          <button class="btn btn-gold btn-sm" type="submit">Update case</button></form>`;
+    const reqs = W.info_requests.map((r: any) => `<div class="iv-card"><div class="iv-head"><strong style="font-size:0.82rem;">${esc((r.meta.items || []).join('; '))}</strong>${statusBadge(r.status === 'open' ? 'awaiting_information' : 'completed')}</div>
+      <div class="iv-meta"><span>From: ${esc(r.meta.requested_from)}</span><span>Due: ${esc(r.meta.due_date || '–')}</span><span>By ${esc(r.actor)} · ${fmtDate(r.created_at)}</span></div>
+      ${r.meta.response ? `<div class="muted-note">Response: ${esc(r.meta.response)}</div>` : ''}
+      ${r.status === 'open' ? `<div class="iv-actions"><input class="form-input" style="flex:1;padding:0.35rem 0.6rem;font-size:0.76rem;" placeholder="What was received?" data-resp="${r.id}"/><button class="btn btn-glass btn-xs" data-fulfil="${r.id}">Mark received</button></div>` : ''}</div>`).join('');
+    const timeline = W.activities.map((x: any) => `<li><span class="t-when">${fmtDateTime(x.created_at)}</span><span><span class="t-kind">${esc(title(x.kind))}</span><div class="t-body">${esc(x.body)}</div><span class="t-actor">${esc(x.actor)}</span></span></li>`).join('');
+    return `<div class="mon-grid cols-2">
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+        ${panel('Case', open ? 'Investigation case' : 'Open a case', caseBox)}
+        ${open ? panel('Correct classification', 'Override the warning level', `
+          <form class="ws-form" id="correctForm"><div class="row"><div><label>Corrected warning level</label><select name="corrected_category"><option value="">Remove correction (use model)</option>${opts(['Low', 'Medium', 'High', 'Critical', 'Insufficient Data'], cs.corrected_category || '')}</select></div></div>
+          <div><label>Reason</label><textarea name="reason" required placeholder="Evidence that the model classification is inaccurate"></textarea></div>
+          <button class="btn btn-glass btn-sm" type="submit">Save correction</button>
+          <p class="muted-note">The model score and its evidence stay on record; the corrected level is used in the queue and dashboard while the case is open.</p></form>`) : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+        ${open ? panel('Notes', 'Add investigation note', `<form class="ws-form" id="noteForm"><div class="row"><div><label>Type</label><select name="kind">${opts(['note', 'decision', 'evidence'])}</select></div></div>
+          <div><textarea name="body" required placeholder="Findings, customer contact, decisions…"></textarea></div><button class="btn btn-gold btn-sm" type="submit">Add note</button></form>`) : ''}
+        ${open ? panel('Information requests', 'Request additional information', `<form class="ws-form" id="infoForm">
+          <div><label>Items (one per line)</label><textarea name="items" required placeholder="Last 3 months bank statements&#10;Salary slips"></textarea></div>
+          <div class="row"><div><label>Requested from</label><input name="requested_from" value="customer"/></div><div><label>Due date</label><input type="date" name="due_date"/></div></div>
+          <button class="btn btn-glass btn-sm" type="submit">Send request</button></form><div style="margin-top:0.8rem;">${reqs}</div>`) : ''}
+        ${panel('Audit trail', `Activity (${W.activities.length})`, `<ul class="timeline">${timeline || '<li class="muted-note">No activity yet</li>'}</ul>`)}
+      </div></div>`;
+  }
+
+  // ── Interventions pane
+  function ivCard(iv: any) {
+    const moves = NEXT[iv.status] || [];
+    return `<div class="iv-card ${iv.overdue ? 'overdue' : ''}">
+      <div class="iv-head"><div><span class="mono muted-note">${esc(iv.reference)}</span> <strong style="font-size:0.88rem;">${esc(iv.recommended_action)}</strong></div>
+        <div>${tierBadge(iv.priority)} ${statusBadge(iv.status)}</div></div>
+      <div class="iv-meta"><span>Scenario: ${esc(iv.scenario_label)}</span><span>Warning: ${esc(iv.warning_category)}</span><span>Facility: <span class="mono">${esc(iv.facility_ref || '–')}</span></span>
+        <span>Owner: ${esc(iv.owner)} (${esc(title(iv.owner_role))})</span><span style="${iv.overdue ? 'color:#FCA5A5' : ''}">Target: ${esc(iv.target_date)}${iv.overdue ? ' · overdue' : ''}</span>
+        ${iv.customer_impacting ? '<span style="color:#FCD34D">Customer-impacting</span>' : ''}${iv.approved_by ? `<span>Approved by ${esc(iv.approved_by)}</span>` : ''}</div>
+      <details><summary class="muted-note" style="cursor:pointer;">Indicators, evidence & decisions</summary>
+        <ul style="font-size:0.76rem;color:var(--white-75);">${iv.contributing_indicators.map((e: string) => `<li>${esc(e)}</li>`).join('')}</ul>
+        ${iv.evidence.length ? `<div class="panel-eyebrow">Evidence</div><ul style="font-size:0.76rem;color:var(--white-75);">${iv.evidence.map((e: string) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
+        ${iv.notes ? `<p class="muted-note">Notes: ${esc(iv.notes)}</p>` : ''}${iv.decision ? `<p class="muted-note">Decision: ${esc(iv.decision)}</p>` : ''}${iv.outcome ? `<p class="muted-note">Outcome: ${esc(iv.outcome)}</p>` : ''}
+      </details>
+      ${iv.status === 'pending_approval' ? `<div class="iv-actions"><input class="form-input" style="flex:1;padding:0.35rem 0.6rem;font-size:0.76rem;" placeholder="Approval comment" data-approve-comment="${iv.id}"/>
+        <button class="btn btn-gold btn-xs" data-approve="${iv.id}" data-ok="1">Approve</button><button class="btn btn-glass btn-xs" data-approve="${iv.id}" data-ok="0">Reject</button>
+        <span class="muted-note">Needs a signed-in approver other than ${esc(iv.created_by)}</span></div>` : ''}
+      ${moves.length ? `<div class="iv-actions"><input class="form-input" style="flex:1;padding:0.35rem 0.6rem;font-size:0.76rem;" placeholder="Outcome / reason / note" data-iv-text="${iv.id}"/>
+        ${moves.map((m) => `<button class="btn ${m === 'completed' ? 'btn-gold' : 'btn-glass'} btn-xs" data-iv="${iv.id}" data-to="${m}">${title(m === 'initiated' ? 'initiate' : m === 'completed' ? 'complete' : m === 'deferred' ? 'defer' : m === 'escalated' ? 'escalate' : 'cancel')}</button>`).join('')}
+        <button class="btn btn-glass btn-xs" data-iv-note="${iv.id}">Add note</button><button class="btn btn-glass btn-xs" data-iv-evidence="${iv.id}">Add evidence</button></div>` : ''}
+    </div>`;
+  }
+  function ivPane() {
+    return panel('Intervention tracking', 'Actions for this customer', W.interventions.map(ivCard).join('') || '<p class="muted-note">No interventions yet. Accept a recommendation on the Overview tab.</p>');
+  }
+
+  // ── Actions
+  async function act(fn: () => Promise<any>, ok: string, tab?: string) {
+    try { await fn(); toast(ok); if (tab) activeTab = tab; await load(); }
+    catch (e: any) { toast(e.message, 'err'); }
+  }
+  const fd = (f: HTMLFormElement) => Object.fromEntries(new FormData(f).entries()) as Record<string, string>;
+
+  function bind() {
+    root.querySelector('#briefBtn')?.addEventListener('click', async () => {
+      const box = root.querySelector('#briefing')!; box.textContent = 'Generating…';
+      try { const r = await ewsFetch(`/workspace/${encodeURIComponent(cid)}/briefing`, { method: 'POST' });
+        box.innerHTML = `${esc(r.briefing)}<div class="muted-note" style="margin-top:0.4rem;">${r.source === 'ai' ? 'LLM: ' + esc(r.model) + ' (numbers verified against the facts)' : 'Template (LLM unavailable or reply rejected)'}</div>`;
+      } catch (e: any) { box.textContent = e.message; }
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-accept]').forEach((b) => b.addEventListener('click', () => {
+      const r = W.analysis.recommendations[Number(b.dataset.accept)];
+      act(() => ewsFetch('/interventions', { method: 'POST', body: { customer_id: cid, scenario: r.scenario, case_id: W.case && W.case.status !== 'closed' ? W.case.id : null, owner: actorName(), actor: actorName() } }),
+        r.requires_approval ? 'Intervention created: awaiting approval' : 'Intervention created', 'interventions');
+    }));
+    root.querySelector<HTMLFormElement>('#openCase')?.addEventListener('submit', (e) => {
+      e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+      act(() => ewsFetch('/cases', { method: 'POST', body: { customer_id: cid, owner: v.owner, owner_role: v.owner_role, summary: v.summary, actor: actorName() } }), 'Case opened');
+    });
+    root.querySelector<HTMLFormElement>('#updateCase')?.addEventListener('submit', (e) => {
+      e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+      act(() => ewsFetch(`/cases/${W.case.id}`, { method: 'PATCH', body: { status: v.status, disposition: v.disposition, owner: v.owner, owner_role: v.owner_role, note: v.note || null, actor: actorName() } }), 'Case updated');
+    });
+    root.querySelector<HTMLFormElement>('#correctForm')?.addEventListener('submit', (e) => {
+      e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+      act(() => ewsFetch(`/cases/${W.case.id}/classification`, { method: 'POST', body: { corrected_category: v.corrected_category || null, reason: v.reason, actor: actorName() } }), 'Classification saved');
+    });
+    root.querySelector<HTMLFormElement>('#noteForm')?.addEventListener('submit', (e) => {
+      e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+      act(() => ewsFetch(`/cases/${W.case.id}/notes`, { method: 'POST', body: { body: v.body, kind: v.kind, actor: actorName() } }), 'Note added');
+    });
+    root.querySelector<HTMLFormElement>('#infoForm')?.addEventListener('submit', (e) => {
+      e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+      const items = v.items.split('\n').map((s) => s.trim()).filter(Boolean);
+      act(() => ewsFetch(`/cases/${W.case.id}/info-requests`, { method: 'POST', body: { items, requested_from: v.requested_from, due_date: v.due_date, actor: actorName() } }), 'Information requested');
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-fulfil]').forEach((b) => b.addEventListener('click', () => {
+      const resp = (root.querySelector(`[data-resp="${b.dataset.fulfil}"]`) as HTMLInputElement)?.value || '';
+      act(() => ewsFetch(`/info-requests/${b.dataset.fulfil}`, { method: 'PATCH', body: { status: 'fulfilled', response: resp, actor: actorName() } }), 'Marked received');
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-classify]').forEach((b) => b.addEventListener('click', () => {
+      const r = W.repayments.find((x: any) => x.id === b.dataset.classify);
+      const box = root.querySelector('#classifyForm')!;
+      box.innerHTML = `<form class="ws-form iv-card" id="clsForm"><strong style="font-size:0.84rem;">Classify ${esc(r.loan_id)} due ${esc(r.due_date)} (${r.dpd} DPD, ${esc(r.repayment_status)})</strong>
+        <div class="row"><div><label>Classification</label><select name="classification">
+          <option value="processing_error">Processing error (exclude from scoring)</option><option value="bank_holiday">Bank holiday / settlement delay (exclude)</option>
+          <option value="data_error">Data error (exclude)</option><option value="customer_delay">Genuine customer delay (keep)</option>
+          <option value="disputed">Disputed (keep, flag)</option><option value="confirmed_miss">Confirmed miss (keep)</option></select></div></div>
+        <div><label>Reason / evidence</label><textarea name="reason" required placeholder="e.g. NACH mandate rejected by bank on 05-Aug; customer funds were available"></textarea></div>
+        <div class="row"><button class="btn btn-gold btn-sm" type="submit">Save & recalculate risk</button><button class="btn btn-glass btn-sm" type="button" id="clsCancel">Cancel</button></div></form>`;
+      box.querySelector('#clsCancel')!.addEventListener('click', () => { box.innerHTML = ''; });
+      box.querySelector<HTMLFormElement>('#clsForm')!.addEventListener('submit', (e) => {
+        e.preventDefault(); const v = fd(e.target as HTMLFormElement);
+        (e.target as HTMLFormElement).querySelector('button')!.textContent = 'Recalculating…';
+        act(async () => {
+          const res = await ewsFetch(`/repayments/${r.id}/classification`, { method: 'POST', body: { classification: v.classification, reason: v.reason, case_id: W.case?.id || null, actor: actorName() } });
+          toast(`Risk recalculated: ${res.score_before ?? '–'} → ${res.score_after ?? '–'}`);
+        }, 'Event classified', 'events');
+      });
+      box.scrollIntoView({ block: 'nearest' });
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-unclassify]').forEach((b) => b.addEventListener('click', () =>
+      act(() => ewsFetch(`/repayments/${b.dataset.unclassify}/classification`, { method: 'DELETE', query: { actor: actorName() } }), 'Classification removed; risk recalculated', 'events')));
+    root.querySelectorAll<HTMLButtonElement>('[data-iv]').forEach((b) => b.addEventListener('click', () => {
+      const text = (root.querySelector(`[data-iv-text="${b.dataset.iv}"]`) as HTMLInputElement)?.value.trim() || '';
+      const to = b.dataset.to!;
+      const body: any = { status: to, actor: actorName() };
+      if (to === 'completed') body.outcome = text; else if (text) body.decision = text;
+      act(() => ewsFetch(`/interventions/${b.dataset.iv}`, { method: 'PATCH', body }), `Intervention ${to}`, 'interventions');
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-iv-note],[data-iv-evidence]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.ivNote || b.dataset.ivEvidence!;
+      const text = (root.querySelector(`[data-iv-text="${id}"]`) as HTMLInputElement)?.value.trim();
+      if (!text) { toast('Type the note or evidence first', 'err'); return; }
+      act(() => ewsFetch(`/interventions/${id}`, { method: 'PATCH', body: b.dataset.ivNote ? { notes: text, actor: actorName() } : { evidence: text, actor: actorName() } }), 'Saved', 'interventions');
+    }));
+    root.querySelectorAll<HTMLButtonElement>('[data-approve]').forEach((b) => b.addEventListener('click', () => {
+      const comment = (root.querySelector(`[data-approve-comment="${b.dataset.approve}"]`) as HTMLInputElement)?.value.trim() || (b.dataset.ok === '1' ? 'Approved' : 'Rejected');
+      act(() => ewsFetch(`/interventions/${b.dataset.approve}/approve`, { method: 'POST', body: { approve: b.dataset.ok === '1', comment } }), b.dataset.ok === '1' ? 'Approved' : 'Rejected', 'interventions');
+    }));
+  }
+
+  load();
+</script>
