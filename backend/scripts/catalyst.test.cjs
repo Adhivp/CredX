@@ -27,6 +27,19 @@ test('workflow defaults missing target variables without accepting incorrect ove
   }
 });
 
+test('CI uses explicit CLI target flags instead of RC-mutating project association', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/deploy-catalyst.yml'), 'utf8');
+  assert.doesNotMatch(workflow, /^\s*catalyst project:use\b/m,
+    'CLI 1.29.1 skips RC loading in CI, so project:use fails even when .catalystrc exists');
+  const inspectAt = workflow.indexOf('node backend/scripts/catalyst.cjs inspect');
+  const deployAt = workflow.indexOf('catalyst deploy appsail --name credx-api');
+  assert.ok(inspectAt > 0 && deployAt > inspectAt, 'Remote Development identity must be checked before deploying');
+  const deployCommand = workflow.slice(deployAt, workflow.indexOf('--non-interactive', deployAt));
+  for (const flag of ['--project "$CATALYST_PROJECT_ID"', '--org "$CATALYST_ORG_ID"', '--dc "$CATALYST_DC"']) {
+    assert.ok(deployCommand.includes(flag), `Deployment must select its target explicitly: ${flag}`);
+  }
+});
+
 test('configuration waits for asynchronous Docker creation to finish', () => {
   const { deploymentReady } = require('./catalyst.cjs');
   assert.equal(typeof deploymentReady, 'function');

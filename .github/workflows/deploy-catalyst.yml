@@ -118,13 +118,12 @@ jobs:
           npm install --global zcatalyst-cli@1.29.1
           printf 'NODE_PATH=%s\n' "$(npm root --global)" >> "$GITHUB_ENV"
           catalyst --version
-      - name: Associate existing project and check service identity
+      - name: Verify existing Development project and service identity
         env:
           CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
-        run: |
-          catalyst project:use "$CATALYST_PROJECT_ID" \
-            --org "$CATALYST_ORG_ID" --dc "$CATALYST_DC" --non-interactive
-          node backend/scripts/catalyst.cjs inspect
+        # CLI 1.29.1 skips RC loading in CI: project:use cannot update its RC.
+        # Deploy selects the target with --project/--org; inspect verifies it remotely.
+        run: node backend/scripts/catalyst.cjs inspect
       - name: Create or update credx-api using CLI name-based upsert
         env:
           CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}

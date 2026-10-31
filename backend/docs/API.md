@@ -3,15 +3,17 @@
 API prefix: `/api/v1`  
 Application version: `0.1.0`  
 Runtime: Python 3.14 / FastAPI  
-Scope: user authentication and the authenticated user's profile.
+Scope: user authentication, the authenticated user's profile, and credit early warning system (EWS) data ingestion, assessment, watchlists, alerts, and explanations.
 
-This reference describes the implemented backend, not a complete banking platform. There are no balances, bank accounts, transfers, payment, MFA, recovery, or KYC endpoints.
+This reference describes the implemented backend, not a complete banking platform. EWS stores imported loan balances and credit-risk data; it does not provide bank accounts, transfers, payments, MFA, recovery, or KYC endpoints.
+
+**Security boundary: every `/api/v1/ews/*` operation is currently unauthenticated.** EWS has no per-user/tenant authorization; reads and writes act on shared data. An access token is required only for `/api/v1/users/me` and `/api/v1/auth/logout`. Do not expose EWS to untrusted clients or upload real customer data without an external access-control boundary. Supplying a bearer token does not add ownership checks to EWS.
 
 ## Base URL and interactive documentation
 
 Local base URL: `http://127.0.0.1:8000`.
 
-For Render, use your service's actual HTTPS URL instead. No deployed hostname is assumed in this document. All paths below are relative to the base URL.
+For a deployed service, use its actual HTTPS URL instead. No deployed hostname is assumed in this document. All paths below are relative to the base URL.
 
 | Resource | URL path |
 | --- | --- |
@@ -20,19 +22,19 @@ For Render, use your service's actual HTTPS URL instead. No deployed hostname is
 | Live OpenAPI JSON | `/openapi.json` |
 | Checked-in OpenAPI JSON | [`openapi.json`](openapi.json) |
 
-The OpenAPI export is generated from the application and can be imported into Postman, Insomnia, or an OpenAPI-compatible client generator. It preserves FastAPI's generated schema unchanged. Service-level `401` and `409` responses are explained here but are not currently enumerated by the generated route response metadata.
+The OpenAPI export is generated from the application and can be imported into Postman, Insomnia, or an OpenAPI-compatible client generator. It preserves FastAPI's generated schema unchanged. Runtime `400`, `401`, `404`, and `409` responses are explained here but are not currently enumerated by the generated route response metadata. Assessment and portfolio responses have no declared response model, so their generated success schemas are unconstrained. Alert decision values are validated at runtime, not represented as an OpenAPI enum.
 
 For installation, migrations, and deployment, see [the backend README](../README.md).
 
 ## Request conventions
 
-- Send JSON bodies with `Content-Type: application/json`; login does not accept an OAuth2 form payload.
+- Send JSON bodies with `Content-Type: application/json` for registration, login, refresh, and alert classification. Login does not accept an OAuth2 form payload. EWS upload uses `multipart/form-data` with a `file` part and a `data_type` query parameter; let your HTTP client set the multipart boundary.
 - Use HTTPS outside local development.
-- Request-body fields not listed in the schema are rejected for registration, login, and refresh.
+- Request-body fields not listed in the schema are rejected for registration, login, refresh, and alert classification. Uploaded tables use separate, less strict column checks; unused columns are ignored.
 - Send access tokens only in the `Authorization` header, never in URLs.
 - Send the latest refresh token in the refresh endpoint's JSON body, not in an Authorization header.
-- There are no authentication cookies, client API keys, pagination parameters, or role-selection fields in this API.
-- `created_at` is a Unix timestamp in seconds. IDs are opaque UUID strings; clients should not infer permissions from them.
+- There are no authentication cookies, client API keys, or role-selection fields. The EWS watchlist has `limit`/`offset` pagination.
+- `created_at` and `assessed_at` are Unix timestamps in seconds. Internal record IDs are opaque UUID strings. EWS route `customer_id` values are external identifiers imported from your data, not user IDs or internal customer UUIDs. See the EWS identifier notes below.
 
 Protected requests use:
 
@@ -52,6 +54,13 @@ In Swagger UI, click **Authorize** and paste the access token only. Swagger adds
 | POST | `/api/v1/auth/refresh` | Refresh token in JSON | 200 |
 | POST | `/api/v1/auth/logout` | Access bearer token | 204 |
 | GET | `/api/v1/users/me` | Access bearer token | 200 |
+| POST | `/api/v1/ews/upload` | None | 200 (inspect `status`) |
+| POST | `/api/v1/ews/assess` | None | 200 |
+| GET | `/api/v1/ews/watchlist` | None | 200 |
+| GET | `/api/v1/ews/customer/{customer_id}` | None | 200 |
+| POST | `/api/v1/ews/alert/{assessment_id}` | None | 200 |
+| POST | `/api/v1/ews/explain/{customer_id}` | None | 200 |
+| GET | `/api/v1/ews/portfolio` | None | 200 |
 
 ## Endpoint details
 
@@ -71,7 +80,7 @@ Response: `200 OK`.
 {"status": "ok"}
 ```
 
-Render's health-check path can be set to `/health`.
+Use `/health` as the process health-check path; it is not a database readiness check.
 
 ### POST /api/v1/auth/register
 
@@ -236,6 +245,144 @@ Response: `200 OK`, with the same user object returned by registration:
 
 Error: `401 Unauthorized` if access authentication fails. A refresh token cannot be used as a bearer token here. Each request checks the database session and user state; an otherwise unexpired JWT does not bypass revocation or account deactivation.
 
+## Early warning system (EWS)
+
+All operations in this section require **no authentication**, including uploads, assessments, and alert classification. They share one data store across callers. There are no authenticated analyst identities or per-customer ownership checks.
+
+Identifier conventions:
+
+- Uploads, assessment filters, customer/explanation routes, watchlists, and portfolio summaries use external `customer_id` values such as `DOC-C001`.
+- `customer.id`, `loans[].customer_id`, and `assessments[].customer_id` in customer detail are internal customer UUIDs. `customer.customer_id` is the external identifier.
+- Uploaded `loan_id` values are external identifiers. Returned `loans[].id` and `repayments[].loan_id` are internal loan UUIDs.
+- Alert routes use the internal assessment UUID from `assessments[].id` in customer detail. The assessment-run response does **not** return this ID.
+
+### POST /api/v1/ews/upload
+
+Import a table. Required query parameter: `data_type`, one of `customers`, `loans`, `repayments`, `exposure`, or `cashflow`. Required multipart field: `file`. No bearer token is required.
+
+```sh
+curl --fail-with-body -X POST "$BASE_URL/api/v1/ews/upload?data_type=customers" \
+  -F 'file=@customers.csv'
+```
+
+The parser selects its format from the filename extension (case-insensitive), not the MIME type: `.csv`, `.xlsx`, `.xls`, or `.json`. JSON must be a table readable by pandas, for example an array of row objects. Excel uses pandas' default first sheet. `.xlsx` is supported by the installed `openpyxl`; `.xls` may fail without an additional pandas-compatible engine such as `xlrd`, which is not a declared dependency.
+
+| `data_type` | Required columns | Optional columns used |
+| --- | --- | --- |
+| `customers` | `customer_id`, `customer_type` | `employment_category`, `portfolio_segment` |
+| `loans` | `customer_id`, `loan_id`, `product_type`, `sanctioned_amount`, `outstanding_balance` | `tenure_months`, `instalment_amount`, `disbursement_date`, `status` |
+| `repayments` | `customer_id`, `loan_id`, `due_date`, `amount_due`, `amount_paid`, `repayment_status` | `payment_date`, `dpd` |
+| `exposure` | `customer_id`, `facility_type`, `outstanding_balance` | `sanctioned_amount`, `credit_limit`, `current_utilisation`, `instalment_amount`, `disbursement_date`, `snapshot_date` |
+| `cashflow` | `customer_id`, `month`, `monthly_inflow` | `monthly_outflow`, `record_date` |
+
+Numeric fields are converted with Python `float()`/`int()`; `month`, `dpd`, and `tenure_months` are integers. Use ISO date strings such as `2026-01-01` for date columns. Dates and status values are not validated by the upload route. There is no row-level Pydantic validation, nonnegative-value enforcement, or explicit application upload-size limit. Omitted numeric fields generally default to zero, text fields to empty strings, and loan `status` to `active`; `payment_date` and `monthly_outflow` can be null. Avoid blank numeric cells: omitted columns and missing cell values are not reliably interchangeable.
+
+Import customers → loans → repayments; upload exposure/cashflow after customers exist:
+
+- Customers are inserted or updated by external ID. Updating a customer without optional text columns resets those fields to empty strings.
+- Loans create a default customer if needed. Existing external loan IDs are skipped, not updated.
+- Repayments append records for existing external loan IDs; unknown loans are silently skipped. The required `customer_id` column is not used to cross-check the loan's owner.
+- Exposure and cashflow append records for existing external customer IDs; unknown customers are silently skipped. Re-uploading append-only data duplicates records. Uploaded `facility_id` is not consumed.
+
+Response: `200 OK`, `DataUploadResponse` with `upload_id` (UUID), `filename`, `records_loaded` (integer), `status`, and `errors` (string array). Success uses `status: "success"` and `errors: []`; zero loaded records can still be successful. `records_loaded` counts inserted/updated rows, not necessarily the number supplied.
+
+Missing required columns or an unknown `data_type` return **HTTP 200** with `status: "error"`, `records_loaded: 0`, and an explanation in `errors`. The failed upload metadata is recorded. Inspect the body rather than relying on HTTP status alone.
+
+Errors: `400` with `{"detail":"Unsupported file format. Use CSV, Excel, or JSON."}` for an unrecognized extension; `422` for missing query/file fields. Parsing, conversion, missing Excel-engine, or database failures are not normalized to row-validation errors and can surface as `500`.
+
+### POST /api/v1/ews/assess
+
+Run synchronous rules and persist a new assessment for every selected customer. No request body or authentication. Optional query `customer_id` selects an external customer ID; omitted or empty selects all customers. Repeated calls append history; they do not replace assessments.
+
+```sh
+curl --fail-with-body -X POST "$BASE_URL/api/v1/ews/assess?customer_id=DOC-C001"
+```
+
+Response: `200 OK`, an object with `total_assessed` and an `assessments` array. Each item contains external `customer_id`, numeric `warning_score`, `risk_category`, `rule_delay_score`, `rule_miss_score`, `rule_exposure_score`, `rule_completeness_score`, `cashflow_score`, and `top_indicators` (string array). IDs/timestamps are retrieved separately through customer detail. The array has no guaranteed order.
+
+Current score: `0.40 × delay + 0.30 × miss + 0.15 × max(0, 100 − completeness)`, clamped to 0–100 and stored rounded to two decimal places. Category is computed before rounding: `Low` below 20, `Medium` from 20 to below 45, `High` from 45 to below 70, otherwise `Critical`.
+
+**Current limitations:** this route runs repayment-delay, miss-classification, and missing-history rules only. Exposure and cashflow scores remain `0.0`, even after those tables are uploaded; the missing-history invocation receives only profiles and repayments, not uploaded loan/exposure/cashflow tables. Rule exceptions are logged and can still produce `200` using defaults (delay/miss `0`, completeness `100` when the corresponding signal is absent). A successful response is not proof that every rule ran or that the result is a validated lending decision.
+
+Error: `404` with `{"detail":"No customers found"}` when no selected customers exist.
+
+### GET /api/v1/ews/watchlist
+
+Return latest assessments, sorted by descending warning score. No body or authentication.
+
+| Query | Default | Behavior |
+| --- | --- | --- |
+| `risk_level` | null | Exact, case-sensitive category match, normally `Low`, `Medium`, `High`, `Critical`; not an enum validator |
+| `customer_segment` | null | Exact match on customer `portfolio_segment` |
+| `product_type` | null | **Echoed in filters only; currently does not filter results** |
+| `min_score` | `0.0` | Numeric inclusive lower bound, no 0–100 validation |
+| `limit` | `50` | Integer 1–1000 |
+| `offset` | `0` | Integer ≥ 0 |
+
+Response: `200 OK`, `WatchlistResponse`: `items`, `total` (matching rows before pagination), and `filters`. Each item has external `customer_id`, `product_type`, `outstanding_exposure`, `warning_score`, `risk_category`, up to three `top_indicators`, integer `active_signals`, and `monitoring_status: "Active"`. Product and exposure come from the single loan with the largest outstanding balance, **not** summed facilities or uploaded exposure records; absent loans yield `""` and `0.0`.
+
+`active_signals` counts delay, miss, exposure, and cashflow scores strictly greater than 20; it excludes completeness. `filters.max_results` echoes the effective `limit`, alongside the four filter values; there is no returned `offset` or `has_more`. No assessed customers yields an empty array and total zero. Invalid numeric pagination/filter inputs return `422`.
+
+Latest selection joins on second-resolution `assessed_at`: multiple assessments for the same customer in the same latest second can appear more than once and inflate `total`. Portfolio aggregation shares this limitation. Ordering among tied scores is unspecified.
+
+### GET /api/v1/ews/customer/{customer_id}
+
+Fetch a customer's history by **external** customer ID. No body or authentication. Response: `200 OK`, `CustomerDetailOut`:
+
+| Field | Contents |
+| --- | --- |
+| `customer` | `id`, external `customer_id`, `customer_type`, `employment_category`, `portfolio_segment`, `created_at` |
+| `loans` | Internal `id`/`customer_id`, external `loan_id`, `product_type`, `sanctioned_amount`, `outstanding_balance`, `tenure_months`, `instalment_amount`, `disbursement_date`, `status` |
+| `repayments` | Internal `id`/`loan_id`, `due_date`, nullable `payment_date`, `amount_due`, `amount_paid`, `dpd`, `repayment_status`; ordered by stored due-date string ascending |
+| `assessments` | Internal `id`/`customer_id`, warning/category and all rule/cashflow scores, `top_indicators` string array, `assessed_at`; descending timestamp |
+| `alerts` | Alert objects described below, descending `created_at` |
+
+Arrays can be empty and are not paginated. Loan ordering and ordering among equal timestamps are unspecified. Uploaded exposure/cashflow rows are **not** returned. Error: `404` with `{"detail":"Customer not found"}`.
+
+### POST /api/v1/ews/alert/{assessment_id}
+
+Append an analyst classification to an assessment UUID obtained from customer detail. No authentication. `analyst_id` is a caller-supplied label, **not a verified user identity**.
+
+| JSON field | Required | Rules |
+| --- | --- | --- |
+| `decision` | Yes | Exactly `Continue Monitoring`, `Requires Investigation`, `False Positive`, or `Escalate for Review` |
+| `reason` | Yes | String, 1–2000 characters; not trimmed (whitespace-only is accepted) |
+| `analyst_id` | No | String or null; defaults to null |
+
+Additional JSON fields are rejected. Example body:
+
+```json
+{"decision":"Requires Investigation","reason":"Review the supplied repayment history.","analyst_id":"docs-analyst"}
+```
+
+Response: `200 OK` (not `201`), `AlertOut`: `id`, `assessment_id`, `decision`, `reason`, nullable `analyst_id`, `original_score`, `original_category`, `preserved_evidence`, and integer `created_at`. Evidence is an object containing `top_indicators` and `rule_scores` with `delay`, `miss`, `exposure`, `completeness`, and `cashflow` values. Classification preserves the assessment's score/evidence; it does not alter the assessment, remove the customer from the watchlist, or change its `monitoring_status`. Repeated posts append more alerts.
+
+Errors: `404` with `{"detail":"Assessment not found"}`; `422` for invalid decisions, missing/invalid fields, or extra fields. Decision error wording/order is not stable.
+
+### POST /api/v1/ews/explain/{customer_id}
+
+Explain the latest stored assessment for an **external** customer ID. No request body or authentication. This does not run an assessment or persist an explanation.
+
+Response: `200 OK`, `ExplainResponse`: external `customer_id`, `explanation` (string), and `contributing_factors` (array of objects with `signal` and numeric `score`). Signals are `repayment_delay`, `miss_classification`, `exposure`, `data_completeness`, and `cashflow`, included only when their score is greater than zero. Completeness is a data-quality score, not a risk score; the current explanation picks the largest raw score as the top driver, which may be completeness. Treat the narrative as advisory, not independently validated risk reasoning.
+
+With no `NEBIUS_API_KEY`, the service uses a local template. With a key, it requests an AI explanation through the configured Nebius endpoint/model. Provider failures fall back to the template and still return `200`; the response has no field distinguishing generated from fallback text. A configured provider receives a prompt containing the customer identifier, warning score/category, top driver, and up to three indicators. Review data-sharing permissions before enabling it. Repeated requests can make repeated external calls; no response cache is implemented.
+
+Errors: `404` with `{"detail":"Customer not found"}` or `{"detail":"No assessment found for customer"}`. Equal latest timestamps have no deterministic tiebreaker.
+
+### GET /api/v1/ews/portfolio
+
+Return a shared-portfolio summary. No query parameters, body, or authentication. Response: `200 OK`:
+
+| Field | Contents |
+| --- | --- |
+| `total_customers` | Count of all imported customers, including unassessed customers |
+| `total_assessed` | Count of latest-assessment rows, subject to the timestamp-tie caveat above |
+| `average_warning_score` | Mean of those assessment scores, rounded to two decimals; `0.0` if none |
+| `risk_distribution` | Category-to-count object with `Low`, `Medium`, `High`, `Critical` initialized to zero |
+| `top_risky_customers` | Up to five highest-score rows: external `customer_id`, `warning_score`, `risk_category`, and up to three `top_indicators` |
+
+This is not a sum of loan/exposure amounts. An empty database returns zero counts/scores and an empty top-customer array.
+
 ## Error response format
 
 ### Authentication error: 401
@@ -333,6 +480,99 @@ curl -sS -o /dev/null -w 'Revoked profile HTTP %{http_code}\n' \
 unset TOKENS ACCESS_TOKEN REFRESH_TOKEN
 ```
 
+## Isolated EWS walkthrough
+
+Run this Python example from `backend/` with the development dependencies installed (`uv run python`) and an optional `TMPDIR` pointing to a writable scratch directory. It uses the real app with FastAPI's TestClient and a disposable SQLite database, without dotenv, real credentials, or external AI calls. It sends no Authorization header, demonstrating the current unprotected EWS boundary. `tests/test_api_docs.py` executes this exact code block.
+
+<!-- ews-walkthrough -->
+```python
+from fastapi.testclient import TestClient
+
+from scripts.export_openapi import isolated_app
+
+uploads = {
+    "customers": (
+        "customer_id,customer_type,portfolio_segment\n"
+        "DOC-C001,individual,docs\n"
+    ),
+    "loans": (
+        "customer_id,loan_id,product_type,sanctioned_amount,outstanding_balance\n"
+        "DOC-C001,DOC-L001,term,10000,8000\n"
+    ),
+    "repayments": (
+        "customer_id,loan_id,due_date,amount_due,amount_paid,repayment_status,dpd\n"
+        "DOC-C001,DOC-L001,2026-01-01,100,100,on_time,0\n"
+    ),
+    "exposure": (
+        "customer_id,facility_type,outstanding_balance\n"
+        "DOC-C001,term,8000\n"
+    ),
+    "cashflow": "customer_id,month,monthly_inflow\nDOC-C001,1,1500\n",
+}
+
+with isolated_app() as app, TestClient(app) as client:
+    assert client.get("/api/v1/ews/portfolio").json()["total_customers"] == 0
+    assert client.post("/api/v1/ews/assess").status_code == 404
+    for data_type, csv in uploads.items():
+        response = client.post(
+            "/api/v1/ews/upload",
+            params={"data_type": data_type},
+            files={"file": (f"{data_type}.csv", csv.encode(), "text/csv")},
+        )
+        assert response.status_code == 200
+        result = response.json()
+        assert result["status"] == "success" and result["records_loaded"] == 1
+
+    assert client.post("/api/v1/ews/explain/DOC-C001").status_code == 404
+    response = client.post("/api/v1/ews/assess", params={"customer_id": "DOC-C001"})
+    assert response.status_code == 200 and response.json()["total_assessed"] == 1
+    assessment = response.json()["assessments"][0]
+    assert assessment["rule_exposure_score"] == assessment["cashflow_score"] == 0.0
+
+    response = client.get("/api/v1/ews/customer/DOC-C001")
+    assert response.status_code == 200
+    detail = response.json()
+    assert len(detail["loans"]) == len(detail["repayments"]) == 1
+    assessment_id = detail["assessments"][0]["id"]
+    response = client.post(
+        f"/api/v1/ews/alert/{assessment_id}",
+        json={"decision": "Requires Investigation", "reason": "Review imported data."},
+    )
+    assert response.status_code == 200
+    alert = response.json()
+    assert alert["analyst_id"] is None
+    assert alert["original_score"] == assessment["warning_score"]
+    assert isinstance(alert["preserved_evidence"], dict)
+    assert client.get("/api/v1/ews/customer/DOC-C001").json()["alerts"][0] == alert
+
+    response = client.get(
+        "/api/v1/ews/watchlist", params={"product_type": "not-a-real-product", "limit": 1}
+    )
+    assert response.status_code == 200
+    watchlist = response.json()
+    assert watchlist["total"] == 1  # product_type is currently ignored by filtering
+    assert watchlist["items"][0]["customer_id"] == "DOC-C001"
+    assert watchlist["items"][0]["monitoring_status"] == "Active"
+    response = client.post("/api/v1/ews/explain/DOC-C001")
+    assert response.status_code == 200 and response.json()["explanation"]
+    response = client.get("/api/v1/ews/portfolio")
+    assert response.status_code == 200 and response.json()["total_assessed"] == 1
+
+    response = client.post(
+        "/api/v1/ews/upload", params={"data_type": "customers"},
+        files={"file": ("invalid.csv", b"customer_id\nDOC-C002\n", "text/csv")},
+    )
+    assert response.status_code == 200 and response.json()["status"] == "error"
+    assert response.json()["records_loaded"] == 0 and response.json()["errors"]
+    assert client.get("/api/v1/ews/watchlist?limit=0").status_code == 422
+    assert client.get("/api/v1/ews/customer/unknown").status_code == 404
+    assert client.get("/api/v1/users/me").status_code == 401
+
+print("Isolated EWS walkthrough passed")
+```
+
+The external AI success/failure paths are not exercised by this offline example. It verifies the local fallback only. Use synthetic data and a controlled provider configuration when testing external explanations.
+
 ## Configuration affecting clients
 
 | Environment variable | Default | Effect |
@@ -343,11 +583,14 @@ unset TOKENS ACCESS_TOKEN REFRESH_TOKEN
 | `LOGIN_LOCK_SECONDS` | `900` | Account lock duration; positive integer |
 | `JWT_ISSUER` | `credx-api` | Required JWT issuer |
 | `JWT_AUDIENCE` | `credx-client` | Required JWT audience |
-| `CORS_ORIGINS` | `[]` | JSON array of allowed browser origins |
+| `CORS_ORIGINS` | `[]` | Parsed setting, currently **not used** by the app middleware |
+| `NEBIUS_API_KEY` | Empty | Enables external AI explanations when configured; never send this key from clients |
+| `NEBIUS_BASE_URL` | `https://api.tokenfactory.us-central1.nebius.com/v1/` | Explanation provider endpoint |
+| `NEBIUS_MODEL` | `deepseek-ai/DeepSeek-V4-Flash-0731` | Explanation model |
 
 `JWT_SECRET` is required; there is no default signing key. Changing it invalidates existing tokens. Never publish this value in client code or documentation.
 
-With no frontend, set `CORS_ORIGINS=[]` in the deployment dashboard. Swagger hosted by the API, curl, and Postman still work. Cross-origin browser access requires explicit frontend origins. CORS is not authentication and does not stop non-browser clients.
+**Current CORS caveat:** `create_app()` hard-codes `allow_origins=["*"]`, `allow_credentials=True`, and all methods/headers. Changing `CORS_ORIGINS` does not currently restrict browser origins. Do not mistake this permissive middleware for access control; CORS never authenticates non-browser clients. This document records current behavior, not a recommended production policy.
 
 JWTs use HS256 and contain `sub`, `sid`, `jti`, `type`, `iat`, `nbf`, `exp`, `iss`, and `aud`. They are signed, not encrypted. Clients should treat tokens as opaque credentials, not authorization data to trust without server validation.
 
@@ -355,22 +598,26 @@ Normal API responses and handled authentication/validation errors include `Cache
 
 ## Refreshing this reference
 
-From `backend/`, while the local server is running:
+From `backend/`, with Python 3.14 dependencies installed (optionally set `TMPDIR` to a writable scratch directory):
 
 ```sh
-curl --fail --silent --show-error http://127.0.0.1:8000/openapi.json -o docs/openapi.json
+uv run python -m scripts.export_openapi
 uv run pytest tests/test_api_docs.py -q
+uv run ruff check scripts/export_openapi.py tests/test_api_docs.py
 ```
+
+The exporter calls the actual `create_app()` factory and `app.openapi()` with a temporary SQLite database under `TMPDIR` (otherwise `RUNNER_TEMP`, then `~/.cache/credx`), synthetic signing material, an isolated environment, and dotenv disabled. It neither reads `.env` nor uses the tracked database; it disables the external AI key and disposes/removes its database afterward. No live server is required. Use it in a dedicated development process, not inside a concurrently running server.
 
 The test compares the checked-in schema to the current application's `/openapi.json` and verifies that every generated operation has an endpoint section in this guide. Update this reference whenever request validation, error behavior, or authentication lifecycle rules change; schema equality alone cannot verify prose.
 
 ## Implementation references
 
-- Routes: [`app/api/v1/auth.py`](../app/api/v1/auth.py), [`app/api/v1/users.py`](../app/api/v1/users.py), [`app/main.py`](../app/main.py).
-- Request/response contracts: [`app/schemas/auth.py`](../app/schemas/auth.py).
+- Routes: [`app/api/v1/auth.py`](../app/api/v1/auth.py), [`app/api/v1/users.py`](../app/api/v1/users.py), [`app/api/v1/ews.py`](../app/api/v1/ews.py), [`app/main.py`](../app/main.py).
+- Request/response contracts: [`app/schemas/auth.py`](../app/schemas/auth.py), [`app/schemas/ews.py`](../app/schemas/ews.py).
+- EWS persistence and explanation behavior: [`app/models/ews.py`](../app/models/ews.py), [`app/services/explainability.py`](../app/services/explainability.py).
 - Authentication behavior: [`app/services/auth.py`](../app/services/auth.py).
 - JWT verification: [`app/core/security.py`](../app/core/security.py).
 - Error redaction and response headers: [`app/core/http.py`](../app/core/http.py).
 - Defaults: [`app/core/config.py`](../app/core/config.py).
 
-This API is an authentication foundation. It must not be represented as production-ready banking security without the additional controls listed in the backend README.
+This API combines an authentication foundation with an unprotected EWS prototype. It is not production-ready banking security: EWS authorization, restrictive CORS, input hardening, and operational controls remain outside this documentation update.

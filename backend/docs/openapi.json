@@ -173,6 +173,376 @@
         ]
       }
     },
+    "/api/v1/ews/upload": {
+      "post": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Upload Data",
+        "operationId": "upload_data_api_v1_ews_upload_post",
+        "parameters": [
+          {
+            "name": "data_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "One of: customers, loans, repayments, exposure, cashflow",
+              "title": "Data Type"
+            },
+            "description": "One of: customers, loans, repayments, exposure, cashflow"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_data_api_v1_ews_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/assess": {
+      "post": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Run Assessment",
+        "operationId": "run_assessment_api_v1_ews_assess_post",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/watchlist": {
+      "get": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Get Watchlist",
+        "operationId": "get_watchlist_api_v1_ews_watchlist_get",
+        "parameters": [
+          {
+            "name": "risk_level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Risk Level"
+            }
+          },
+          {
+            "name": "product_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Type"
+            }
+          },
+          {
+            "name": "customer_segment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Segment"
+            }
+          },
+          {
+            "name": "min_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0.0,
+              "title": "Min Score"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/customer/{customer_id}": {
+      "get": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Get Customer Detail",
+        "operationId": "get_customer_detail_api_v1_ews_customer__customer_id__get",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Customer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/alert/{assessment_id}": {
+      "post": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Classify Alert",
+        "operationId": "classify_alert_api_v1_ews_alert__assessment_id__post",
+        "parameters": [
+          {
+            "name": "assessment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assessment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/explain/{customer_id}": {
+      "post": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Explain Customer",
+        "operationId": "explain_customer_api_v1_ews_explain__customer_id__post",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Customer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ews/portfolio": {
+      "get": {
+        "tags": [
+          "ews"
+        ],
+        "summary": "Portfolio Summary",
+        "operationId": "portfolio_summary_api_v1_ews_portfolio_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -201,6 +571,258 @@
   },
   "components": {
     "schemas": {
+      "AlertCreate": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "analyst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "title": "AlertCreate"
+      },
+      "AlertOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "assessment_id": {
+            "type": "string",
+            "title": "Assessment Id"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "analyst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Id"
+          },
+          "original_score": {
+            "type": "number",
+            "title": "Original Score"
+          },
+          "original_category": {
+            "type": "string",
+            "title": "Original Category"
+          },
+          "preserved_evidence": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Preserved Evidence"
+          },
+          "created_at": {
+            "type": "integer",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "assessment_id",
+          "decision",
+          "reason",
+          "analyst_id",
+          "original_score",
+          "original_category",
+          "preserved_evidence",
+          "created_at"
+        ],
+        "title": "AlertOut"
+      },
+      "Body_upload_data_api_v1_ews_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_data_api_v1_ews_upload_post"
+      },
+      "CustomerDetailOut": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerOut"
+          },
+          "loans": {
+            "items": {
+              "$ref": "#/components/schemas/LoanFacilityOut"
+            },
+            "type": "array",
+            "title": "Loans"
+          },
+          "repayments": {
+            "items": {
+              "$ref": "#/components/schemas/RepaymentRecordOut"
+            },
+            "type": "array",
+            "title": "Repayments"
+          },
+          "assessments": {
+            "items": {
+              "$ref": "#/components/schemas/WarningAssessmentOut"
+            },
+            "type": "array",
+            "title": "Assessments"
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertOut"
+            },
+            "type": "array",
+            "title": "Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer",
+          "loans",
+          "repayments",
+          "assessments",
+          "alerts"
+        ],
+        "title": "CustomerDetailOut"
+      },
+      "CustomerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "customer_type": {
+            "type": "string",
+            "title": "Customer Type"
+          },
+          "employment_category": {
+            "type": "string",
+            "title": "Employment Category"
+          },
+          "portfolio_segment": {
+            "type": "string",
+            "title": "Portfolio Segment"
+          },
+          "created_at": {
+            "type": "integer",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "customer_id",
+          "customer_type",
+          "employment_category",
+          "portfolio_segment",
+          "created_at"
+        ],
+        "title": "CustomerOut"
+      },
+      "DataUploadResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "records_loaded": {
+            "type": "integer",
+            "title": "Records Loaded"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "filename",
+          "records_loaded",
+          "status",
+          "errors"
+        ],
+        "title": "DataUploadResponse"
+      },
+      "ExplainResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "contributing_factors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Contributing Factors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "explanation",
+          "contributing_factors"
+        ],
+        "title": "ExplainResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -213,6 +835,64 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "LoanFacilityOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "loan_id": {
+            "type": "string",
+            "title": "Loan Id"
+          },
+          "product_type": {
+            "type": "string",
+            "title": "Product Type"
+          },
+          "sanctioned_amount": {
+            "type": "number",
+            "title": "Sanctioned Amount"
+          },
+          "outstanding_balance": {
+            "type": "number",
+            "title": "Outstanding Balance"
+          },
+          "tenure_months": {
+            "type": "integer",
+            "title": "Tenure Months"
+          },
+          "instalment_amount": {
+            "type": "number",
+            "title": "Instalment Amount"
+          },
+          "disbursement_date": {
+            "type": "string",
+            "title": "Disbursement Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "customer_id",
+          "loan_id",
+          "product_type",
+          "sanctioned_amount",
+          "outstanding_balance",
+          "tenure_months",
+          "instalment_amount",
+          "disbursement_date",
+          "status"
+        ],
+        "title": "LoanFacilityOut"
       },
       "LoginRequest": {
         "properties": {
@@ -288,6 +968,61 @@
           "password"
         ],
         "title": "RegisterRequest"
+      },
+      "RepaymentRecordOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "loan_id": {
+            "type": "string",
+            "title": "Loan Id"
+          },
+          "due_date": {
+            "type": "string",
+            "title": "Due Date"
+          },
+          "payment_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Date"
+          },
+          "amount_due": {
+            "type": "number",
+            "title": "Amount Due"
+          },
+          "amount_paid": {
+            "type": "number",
+            "title": "Amount Paid"
+          },
+          "dpd": {
+            "type": "integer",
+            "title": "Dpd"
+          },
+          "repayment_status": {
+            "type": "string",
+            "title": "Repayment Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "loan_id",
+          "due_date",
+          "payment_date",
+          "amount_due",
+          "amount_paid",
+          "dpd",
+          "repayment_status"
+        ],
+        "title": "RepaymentRecordOut"
       },
       "TokenResponse": {
         "properties": {
@@ -389,6 +1124,199 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WarningAssessmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "warning_score": {
+            "type": "number",
+            "title": "Warning Score"
+          },
+          "risk_category": {
+            "type": "string",
+            "title": "Risk Category"
+          },
+          "rule_delay_score": {
+            "type": "number",
+            "title": "Rule Delay Score"
+          },
+          "rule_miss_score": {
+            "type": "number",
+            "title": "Rule Miss Score"
+          },
+          "rule_exposure_score": {
+            "type": "number",
+            "title": "Rule Exposure Score"
+          },
+          "rule_completeness_score": {
+            "type": "number",
+            "title": "Rule Completeness Score"
+          },
+          "cashflow_score": {
+            "type": "number",
+            "title": "Cashflow Score"
+          },
+          "top_indicators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Top Indicators"
+          },
+          "assessed_at": {
+            "type": "integer",
+            "title": "Assessed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "customer_id",
+          "warning_score",
+          "risk_category",
+          "rule_delay_score",
+          "rule_miss_score",
+          "rule_exposure_score",
+          "rule_completeness_score",
+          "cashflow_score",
+          "top_indicators",
+          "assessed_at"
+        ],
+        "title": "WarningAssessmentOut"
+      },
+      "WatchlistEntry": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "product_type": {
+            "type": "string",
+            "title": "Product Type",
+            "default": ""
+          },
+          "outstanding_exposure": {
+            "type": "number",
+            "title": "Outstanding Exposure",
+            "default": 0.0
+          },
+          "warning_score": {
+            "type": "number",
+            "title": "Warning Score"
+          },
+          "risk_category": {
+            "type": "string",
+            "title": "Risk Category"
+          },
+          "top_indicators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Top Indicators"
+          },
+          "active_signals": {
+            "type": "integer",
+            "title": "Active Signals"
+          },
+          "monitoring_status": {
+            "type": "string",
+            "title": "Monitoring Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "warning_score",
+          "risk_category",
+          "top_indicators",
+          "active_signals",
+          "monitoring_status"
+        ],
+        "title": "WatchlistEntry"
+      },
+      "WatchlistFilters": {
+        "properties": {
+          "product_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Type"
+          },
+          "customer_segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Segment"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "min_score": {
+            "type": "number",
+            "title": "Min Score",
+            "default": 0.0
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "title": "WatchlistFilters"
+      },
+      "WatchlistResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/WatchlistFilters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "filters"
+        ],
+        "title": "WatchlistResponse"
       }
     },
     "securitySchemes": {
