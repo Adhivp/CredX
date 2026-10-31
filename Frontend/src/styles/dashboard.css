@@ -911,3 +911,30 @@
 @media (max-width: 640px) {
   .method-table { display: block; overflow-x: auto; }
 }
+
+.method-terms {
+  display: grid;
+  grid-template-columns: minmax(130px, max-content) 1fr;
+  gap: 0.4rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.method-terms dt { color: var(--text-primary); font-weight: 600; }
+.method-terms dd { margin: 0; }
+
+@media (max-width: 640px) {
+  .method-terms { grid-template-columns: 1fr; gap: 0.1rem; }
+  .method-terms dd { margin-bottom: 0.5rem; }
+}
+
+.method-question {
+  color: var(--text-primary);
+  font-style: italic;
+  margin-bottom: 0.35rem;
+}
+
+.method-source {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+}

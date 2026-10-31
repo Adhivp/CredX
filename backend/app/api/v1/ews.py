@@ -153,22 +153,27 @@ def _insert_records(db: Session, df: pd.DataFrame, data_type: str) -> int:
                 cust = Customer(customer_id=str(row["customer_id"]))
                 db.add(cust)
                 db.flush()
+            values = dict(
+                customer_id=cust.id,
+                product_type=str(row.get("product_type") or ""),
+                sanctioned_amount=float(row.get("sanctioned_amount") or 0),
+                outstanding_balance=float(row.get("outstanding_balance") or 0),
+                tenure_months=int(row.get("tenure_months") or 0),
+                instalment_amount=float(row.get("instalment_amount") or 0),
+                disbursement_date=str(row.get("disbursement_date") or ""),
+                status=str(row.get("status") or "active"),
+            )
             existing = db.execute(
                 select(LoanFacility).where(LoanFacility.loan_id == str(row["loan_id"]))
             ).scalar_one_or_none()
-            if not existing:
-                db.add(LoanFacility(
-                    customer_id=cust.id,
-                    loan_id=str(row["loan_id"]),
-                    product_type=str(row.get("product_type", "")),
-                    sanctioned_amount=float(row.get("sanctioned_amount", 0)),
-                    outstanding_balance=float(row.get("outstanding_balance", 0)),
-                    tenure_months=int(row.get("tenure_months", 0)),
-                    instalment_amount=float(row.get("instalment_amount", 0)),
-                    disbursement_date=str(row.get("disbursement_date", "")),
-                    status=str(row.get("status", "active")),
-                ))
-                count += 1
+            # Re-uploading a loan updates it (and counts it), like the other data types.
+            if existing:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(LoanFacility(loan_id=str(row["loan_id"]), **values))
+            db.flush()
+            count += 1
 
     elif data_type == "repayments":
         for _, row in df.iterrows():

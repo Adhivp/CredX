@@ -87,57 +87,127 @@ const models = [
     </section>
 
     <section>
+      <h4>Key terms</h4>
+      <dl class="method-terms">
+        <dt>Rule</dt>
+        <dd>A fixed, written-down check, for example "more than 30% of payments late = 30 points".
+          Anyone can read and verify it, and it never changes by itself. CredX has four rules.</dd>
+        <dt>Model</dt>
+        <dd>A formula learned from examples of past customers and whether they defaulted. Nobody
+          writes its logic by hand; it finds the patterns in the data. CredX has two models.</dd>
+        <dt>Score</dt>
+        <dd>A number from 0 to 100. For every score except data quality, higher means more risk.</dd>
+        <dt>Default</dt>
+        <dd>What the model predicts. In the Home Credit data, a customer "defaulted" if they paid
+          late by more than a set number of days on at least one of the first instalments of their loan.</dd>
+        <dt>Instalment</dt>
+        <dd>One scheduled payment on a loan (for example the 5 March EMI).</dd>
+        <dt>Days past due (DPD)</dt>
+        <dd>How many days after the due date an instalment was paid. 0 = on time.</dd>
+        <dt>Late payment</dt>
+        <dd>An instalment paid after its due date (DPD above 0).</dd>
+        <dt>Miss</dt>
+        <dd>Any instalment not paid <em>in full and on time</em>: paid late, not paid at all, or
+          paid only partly.</dd>
+        <dt>Streak</dt>
+        <dd>Misses in a row, with no good payment in between.</dd>
+        <dt>Recovery</dt>
+        <dd>A miss that is followed by the next instalment paid on time and in full (at least 95%).
+          It shows the customer got back on track.</dd>
+        <dt>Exposure</dt>
+        <dd>How much credit the customer owes or can draw on, across all their loans and cards.</dd>
+        <dt>Utilisation</dt>
+        <dd>Amount owed ÷ amount sanctioned (or ÷ the card limit). 90% means almost all of the
+          credit has been used.</dd>
+        <dt>Debt-to-income, payment-to-income</dt>
+        <dd>Total amount owed ÷ monthly income, and monthly instalments ÷ monthly income. They
+          show whether the customer can afford their debt. Income is the monthly cash-flow inflow.</dd>
+        <dt>Cash flow</dt>
+        <dd>Money coming into the customer's account each month (inflow).</dd>
+        <dt>Baseline, lift</dt>
+        <dd>The baseline is the average default rate, 8.07% in Home Credit. Lift is the
+          customer's predicted default rate ÷ the baseline: 2× means twice as risky as average.</dd>
+        <dt>Thin file</dt>
+        <dd>A customer with too little history to judge, shown as Insufficient data.</dd>
+      </dl>
+    </section>
+
+    <section>
       <h4>Rule scores <small>shown to explain the signals, not added to the final score</small></h4>
       <p>
         The model reads the underlying repayment, exposure and income data directly. The four
-        rules turn the same data into readable 0–100 scores and warning messages, using thresholds
-        calibrated on Home Credit.
+        rules turn the same data into readable 0–100 scores and warning messages. In each rule,
+        the <strong>cutoffs</strong> (where points start to apply) come from an analysis of the
+        Home Credit data. The <strong>points</strong> per check were chosen by the team, and checks
+        marked † were not analysed against Home Credit.
       </p>
     </section>
 
     <div class="method-grid">
       <section>
         <h4>Delay <small>Rule 1 · higher = worse</small></h4>
+        <p class="method-question">How late does the customer pay, and is it getting worse?</p>
         <ul>
-          <li>Late-payment ratio: up to 30 pts</li>
-          <li>Max days past due: up to 20 pts</li>
-          <li>Consecutive late payments: up to 15 pts</li>
-          <li>Average days late, DPD trend, partial payments: up to 10 pts each</li>
-          <li>12-month context: up to 5 pts</li>
+          <li>Share of instalments paid late: up to 30 pts</li>
+          <li>Worst days past due on any instalment: up to 20 pts</li>
+          <li>Late payments in a row: up to 15 pts</li>
+          <li>Average days late when late: up to 10 pts</li>
+          <li>Days past due rising over the last 6 months†: up to 10 pts</li>
+          <li>Partial payments and unpaid amounts†: up to 10 pts</li>
+          <li>Lateness in the last 12 months†: up to 5 pts</li>
         </ul>
+        <p class="method-source">From the data: more than 30% late defaults at 12.8–15.8%,
+          against 8.07% on average.</p>
       </section>
 
       <section>
-        <h4>Miss <small>Rule 2 · higher = worse</small></h4>
+        <h4>Miss pattern <small>Rule 2 · higher = worse</small></h4>
+        <p class="method-question">Are the misses a one-off (a holiday, a salary delay) or a
+          lasting problem?</p>
         <ul>
-          <li>Recovery rate: up to 30 pts</li>
-          <li>Longest late streak: up to 25 pts</li>
-          <li>Miss frequency: up to 15 pts</li>
-          <li>Recency and clustering: up to 10 pts each</li>
-          <li>Holiday or month-end delays: up to −10 pts</li>
+          <li>Recovery rate, the share of misses followed by a good payment: up to 30 pts</li>
+          <li>Longest streak of misses: up to 25 pts</li>
+          <li>How often they miss†: up to 15 pts</li>
+          <li>How recent the misses are†: up to 10 pts</li>
+          <li>Misses bunched together†: up to 10 pts</li>
+          <li>Misses around holidays or month end†: up to −10 pts (lowers the score)</li>
         </ul>
-        <p>Temporary below 25 · Inconclusive 25–50 · Sustained above 50.</p>
+        <p>Below 25 = <strong>Temporary</strong> (a one-off), 25–50 = <strong>Inconclusive</strong>
+          (watch it), above 50 = <strong>Sustained</strong> (a lasting problem).</p>
+        <p class="method-source">From the data: customers who recover from at least 80% of their
+          misses default at 7.84%, slightly below average.</p>
       </section>
 
       <section>
         <h4>Exposure <small>Rule 3 · higher = worse</small></h4>
+        <p class="method-question">How much debt is the customer carrying, and can they afford it?</p>
         <ul>
-          <li>Utilisation (outstanding ÷ sanctioned): up to 25 pts</li>
+          <li>Utilisation across loans: up to 25 pts</li>
           <li>Card or overdraft utilisation: up to 20 pts</li>
-          <li>Active loans, debt-to-income: up to 15 pts each</li>
-          <li>New loans in 3 months, balance trend: up to 10 pts each</li>
+          <li>Number of active loans: up to 15 pts</li>
+          <li>Debt-to-income: up to 15 pts (3 pts if income is unknown)</li>
+          <li>New loans taken in the last 3 months†: up to 10 pts</li>
+          <li>Outstanding balance rising over time†: up to 10 pts</li>
         </ul>
+        <p class="method-source">From the data: card utilisation above 95% defaults at 15.5–20.6%.</p>
       </section>
 
       <section>
-        <h4>Data quality <small>Rule 4 · gate</small></h4>
+        <h4>Data quality <small>Rule 4 · higher = better · a gate</small></h4>
+        <p class="method-question">Do we have enough data to judge this customer at all?</p>
         <ul>
-          <li>Repayment records: up to 35 pts</li>
-          <li>Loan and credit-limit data: up to 20 pts</li>
+          <li>Number of repayment records: up to 35 pts</li>
+          <li>Loan and credit-limit data on file: up to 20 pts</li>
           <li>Months of history: up to 15 pts</li>
-          <li>Income and DPD fields, freshness, coverage: up to 10 pts each</li>
+          <li>Income and DPD fields present: up to 10 pts</li>
+          <li>How recent the data is†: up to 10 pts</li>
+          <li>Required fields filled in: up to 10 pts</li>
         </ul>
-        <p>Complete ≥ 75 · Adequate 50–74 · Partial 25–49 · Insufficient &lt; 25.</p>
+        <p>Complete ≥ 75 · Adequate 50–74 · Partial 25–49 · Insufficient &lt; 25. It is not added to
+          the risk score; it decides whether a score is shown.</p>
+        <p class="method-source">From the data: missing data is not a sign of risk. Customers with
+          no repayment history defaulted at 5.98%, below average, so a thin file is tagged
+          rather than scored low.</p>
       </section>
     </div>
 
