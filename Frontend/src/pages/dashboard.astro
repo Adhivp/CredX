@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import ScoreMethodology from "../components/dashboard/ScoreMethodology.astro";
 ---
 
 <Layout title="CredX — EWS Dashboard">
@@ -18,6 +19,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
       <div id="content">
         <div class="loading">Loading portfolio data…</div>
       </div>
+      <ScoreMethodology />
     </main>
   </div>
 </Layout>
@@ -39,12 +41,14 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
 
   function renderDashboard(data, container) {
     const dist = data.risk_distribution || {};
-    const total = (dist.Low || 0) + (dist.Medium || 0) + (dist.High || 0) + (dist.Critical || 0);
+    const unrated = dist['Insufficient Data'] || 0;
+    const total = (dist.Low || 0) + (dist.Medium || 0) + (dist.High || 0) + (dist.Critical || 0) + unrated;
 
     const pctLow = total ? ((dist.Low || 0) / total * 100) : 0;
     const pctMed = total ? ((dist.Medium || 0) / total * 100) : 0;
     const pctHigh = total ? ((dist.High || 0) / total * 100) : 0;
     const pctCrit = total ? ((dist.Critical || 0) / total * 100) : 0;
+    const pctUnrated = total ? (unrated / total * 100) : 0;
 
     const topRows = (data.top_risky_customers || []).map(c => {
       const badgeCls = `badge-${c.risk_category.toLowerCase()}`;
@@ -68,7 +72,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
           <div class="stat-card-value gold">${data.total_assessed}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-card-label">Avg Warning Score</div>
+          <div class="stat-card-label">Avg Warning Score <span class="info-tip" tabindex="0" title="Average over rated customers only. Customers tagged Insufficient Data are excluded because their provisional score is not a risk rating.">i</span></div>
           <div class="stat-card-value">${data.average_warning_score.toFixed(1)}</div>
         </div>
         <div class="stat-card">
@@ -85,6 +89,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
           ${pctMed > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctMed}%;background:#F59E0B">${dist.Medium}</div>` : ''}
           ${pctHigh > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctHigh}%;background:#F97316">${dist.High}</div>` : ''}
           ${pctCrit > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctCrit}%;background:#EF4444">${dist.Critical}</div>` : ''}
+          ${pctUnrated > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctUnrated}%;background:repeating-linear-gradient(45deg,#64748B 0 6px,#94A3B8 6px 12px)">${unrated}</div>` : ''}
         </div>
         ` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No assessments yet. Upload data and run assessment.</div>'}
         <div class="risk-bar-legend">
@@ -92,6 +97,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
           <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F59E0B"></span> Medium (${dist.Medium || 0})</div>
           <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F97316"></span> High (${dist.High || 0})</div>
           <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#EF4444"></span> Critical (${dist.Critical || 0})</div>
+          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#94A3B8"></span> Insufficient data (${unrated})</div>
         </div>
       </div>
 

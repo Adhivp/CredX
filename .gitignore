@@ -9,9 +9,10 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Models
+# Models (the production models are tracked so deployments can score with them)
 *.pkl
 *.joblib
+!core/models/saved/*.joblib
 
 # OS
 .DS_Store

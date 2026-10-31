@@ -177,15 +177,23 @@ def _insert_records(db: Session, df: pd.DataFrame, data_type: str) -> int:
             ).scalar_one_or_none()
             if not loan:
                 continue
-            db.add(RepaymentRecord(
-                loan_id=loan.id,
-                due_date=str(row["due_date"]),
+            values = dict(
                 payment_date=str(row["payment_date"]) if pd.notna(row.get("payment_date")) else None,
                 amount_due=float(row.get("amount_due", 0)),
                 amount_paid=float(row.get("amount_paid", 0)),
                 dpd=int(row.get("dpd", 0)),
                 repayment_status=str(row.get("repayment_status", "on_time")),
-            ))
+            )
+            # One instalment per loan + due date: re-uploading a file updates, never duplicates.
+            existing = db.execute(select(RepaymentRecord).where(
+                RepaymentRecord.loan_id == loan.id, RepaymentRecord.due_date == str(row["due_date"]),
+            ).limit(1)).scalar_one_or_none()
+            if existing:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(RepaymentRecord(loan_id=loan.id, due_date=str(row["due_date"]), **values))
+            db.flush()
             count += 1
 
     elif data_type == "exposure":
@@ -195,17 +203,27 @@ def _insert_records(db: Session, df: pd.DataFrame, data_type: str) -> int:
             ).scalar_one_or_none()
             if not cust:
                 continue
-            db.add(CustomerExposure(
+            key = dict(
                 customer_id=cust.id,
                 facility_type=str(row.get("facility_type", "")),
+                disbursement_date=str(row.get("disbursement_date", "")),
+                snapshot_date=str(row.get("snapshot_date", "")),
+            )
+            values = dict(
                 sanctioned_amount=float(row.get("sanctioned_amount", 0)),
                 credit_limit=float(row.get("credit_limit", 0)),
                 current_utilisation=float(row.get("current_utilisation", 0)),
                 outstanding_balance=float(row.get("outstanding_balance", 0)),
                 instalment_amount=float(row.get("instalment_amount", 0)),
-                disbursement_date=str(row.get("disbursement_date", "")),
-                snapshot_date=str(row.get("snapshot_date", "")),
-            ))
+            )
+            # One row per facility per snapshot: re-uploading updates, never duplicates.
+            existing = db.execute(select(CustomerExposure).filter_by(**key).limit(1)).scalar_one_or_none()
+            if existing:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(CustomerExposure(**key, **values))
+            db.flush()
             count += 1
 
     elif data_type == "cashflow":
@@ -215,13 +233,21 @@ def _insert_records(db: Session, df: pd.DataFrame, data_type: str) -> int:
             ).scalar_one_or_none()
             if not cust:
                 continue
-            db.add(CashFlowRecord(
-                customer_id=cust.id,
-                month=int(row["month"]),
+            values = dict(
                 monthly_inflow=float(row["monthly_inflow"]),
                 monthly_outflow=float(row["monthly_outflow"]) if pd.notna(row.get("monthly_outflow")) else None,
                 record_date=str(row.get("record_date", "")),
-            ))
+            )
+            # One row per customer + month: re-uploading updates, never duplicates.
+            existing = db.execute(select(CashFlowRecord).where(
+                CashFlowRecord.customer_id == cust.id, CashFlowRecord.month == int(row["month"]),
+            ).limit(1)).scalar_one_or_none()
+            if existing:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(CashFlowRecord(customer_id=cust.id, month=int(row["month"]), **values))
+            db.flush()
             count += 1
 
     return count
@@ -232,6 +258,10 @@ def _insert_records(db: Session, df: pd.DataFrame, data_type: str) -> int:
 
 def _build_repayment_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
     """Load repayment records from DB and shape them for the core rules."""
+    cols = [
+        "customer_id", "loan_id", "due_date", "payment_date",
+        "amount_due", "amount_paid", "dpd", "repayment_status",
+    ]
     query = (
         select(
             Customer.customer_id,
@@ -248,17 +278,9 @@ def _build_repayment_df(db: Session, customer_ids: list[str] | None = None) -> p
     )
     if customer_ids:
         query = query.where(Customer.customer_id.in_(customer_ids))
-
-    rows = db.execute(query).all()
-    if not rows:
-        return pd.DataFrame(columns=[
-            "customer_id", "loan_id", "due_date", "payment_date",
-            "amount_due", "amount_paid", "dpd", "repayment_status",
-        ])
-    return pd.DataFrame(rows, columns=[
-        "customer_id", "loan_id", "due_date", "payment_date",
-        "amount_due", "amount_paid", "dpd", "repayment_status",
-    ])
+    df = pd.DataFrame(db.execute(query).all(), columns=cols)
+    # Re-uploading a file appends duplicate instalments; one row per loan + due date.
+    return df.drop_duplicates(subset=["loan_id", "due_date"], keep="last")
 
 
 def _build_customer_profiles_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
@@ -271,6 +293,77 @@ def _build_customer_profiles_df(db: Session, customer_ids: list[str] | None = No
     return pd.DataFrame(rows, columns=["customer_id", "customer_type", "created_at"])
 
 
+def _build_loans_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
+    """Loans per customer, with credit limit / utilisation from the exposure snapshot."""
+    cols = ["customer_id", "loan_id", "sanctioned_amount", "outstanding_balance"]
+    query = select(
+        Customer.customer_id, LoanFacility.loan_id,
+        LoanFacility.sanctioned_amount, LoanFacility.outstanding_balance,
+    ).join(LoanFacility, LoanFacility.customer_id == Customer.id)
+    if customer_ids:
+        query = query.where(Customer.customer_id.in_(customer_ids))
+    loans = pd.DataFrame(db.execute(query).all(), columns=cols)
+
+    exp_query = select(
+        Customer.customer_id, CustomerExposure.credit_limit, CustomerExposure.current_utilisation,
+    ).join(CustomerExposure, CustomerExposure.customer_id == Customer.id)
+    if customer_ids:
+        exp_query = exp_query.where(Customer.customer_id.in_(customer_ids))
+    exposure = pd.DataFrame(
+        db.execute(exp_query).all(), columns=["customer_id", "credit_limit", "current_utilisation"]
+    )
+    if loans.empty or exposure.empty:
+        return loans
+    exposure = exposure.groupby("customer_id", as_index=False).max()
+    return loans.merge(exposure, on="customer_id", how="left")
+
+
+def _build_income_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
+    """Monthly cash-flow inflow is the only income evidence the platform ingests."""
+    query = select(
+        Customer.customer_id, CashFlowRecord.monthly_inflow, CashFlowRecord.record_date,
+    ).join(CashFlowRecord, CashFlowRecord.customer_id == Customer.id)
+    if customer_ids:
+        query = query.where(Customer.customer_id.in_(customer_ids))
+    rows = [(cid, inflow, date or None) for cid, inflow, date in db.execute(query).all()]
+    return pd.DataFrame(rows, columns=["customer_id", "monthly_income", "income_date"])
+
+
+def _build_exposure_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
+    """Exposure snapshots in the shape core.rules.increasing_exposure expects."""
+    cols = [
+        "customer_id", "facility_type", "sanctioned_amount", "credit_limit", "current_utilisation",
+        "outstanding_balance", "instalment_amount", "disbursement_date", "snapshot_date",
+    ]
+    query = select(
+        Customer.customer_id, CustomerExposure.facility_type, CustomerExposure.sanctioned_amount,
+        CustomerExposure.credit_limit, CustomerExposure.current_utilisation,
+        CustomerExposure.outstanding_balance, CustomerExposure.instalment_amount,
+        CustomerExposure.disbursement_date, CustomerExposure.snapshot_date,
+    ).join(CustomerExposure, CustomerExposure.customer_id == Customer.id)
+    if customer_ids:
+        query = query.where(Customer.customer_id.in_(customer_ids))
+    df = pd.DataFrame(db.execute(query).all(), columns=cols).drop_duplicates()
+    for col in ("disbursement_date", "snapshot_date"):
+        df[col] = pd.to_datetime(df[col].replace("", None), errors="coerce")
+    return df.dropna(subset=["snapshot_date"])
+
+
+def _build_cashflow_df(db: Session, customer_ids: list[str] | None = None) -> pd.DataFrame:
+    query = select(
+        Customer.customer_id, CashFlowRecord.month, CashFlowRecord.monthly_inflow,
+    ).join(CashFlowRecord, CashFlowRecord.customer_id == Customer.id)
+    if customer_ids:
+        query = query.where(Customer.customer_id.in_(customer_ids))
+    df = pd.DataFrame(db.execute(query).all(), columns=["customer_id", "month", "monthly_inflow"])
+    return df.drop_duplicates(subset=["customer_id", "month"], keep="last")
+
+
+# Customers whose data is too thin to score. Their provisional score is kept for
+# audit but must not be read as a risk rating (see core/rules/rules.md, Rule 4).
+INSUFFICIENT_DATA = "Insufficient Data"
+
+
 def _score_to_category(score: float) -> str:
     if score < 20:
         return "Low"
@@ -281,95 +374,176 @@ def _score_to_category(score: float) -> str:
     return "Critical"
 
 
+# Fallback only, when the model files are absent: same weights as core/ews_engine.py.
+SIGNAL_WEIGHTS = {"delay": 0.30, "miss": 0.20, "exposure": 0.25, "cashflow": 0.25}
+
+# Final score = warning-score model (XGBoost trained on Home Credit only, see
+# core/models/warning_score_model.py), blended with the cash-flow model when it ran:
+# Home Credit has no cash-flow data, so that signal cannot be learned by the model and
+# keeps its core/ews_engine.py design weight.
+CASHFLOW_BLEND_WEIGHT = 0.25
+
+
+def _run_signals(name: str, fn, *args) -> dict:
+    """Run one rule/model; a failure in one must not silently zero the others."""
+    try:
+        return fn(*args) or {}
+    except Exception:
+        logger.exception("%s failed", name)
+        return {}
+
+
 @router.post("/assess")
 def run_assessment(
     customer_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    from core.rules.increasing_exposure import detect_increasing_exposure
+    from core.rules.missing_history import detect_missing_history
+    from core.rules.repayment_delays import detect_repayment_delays
+    from core.rules.temporary_vs_sustained import classify_misses
+
     filter_ids = [customer_id] if customer_id else None
     repayment_df = _build_repayment_df(db, filter_ids)
     profiles_df = _build_customer_profiles_df(db, filter_ids)
-
     if profiles_df.empty:
         raise HTTPException(status_code=404, detail="No customers found")
 
-    # Run core rules
-    delay_signals = {}
-    miss_signals = {}
-    try:
-        from core.rules.repayment_delays import detect_repayment_delays
-        from core.rules.temporary_vs_sustained import classify_misses
+    exposure_df = _build_exposure_df(db, filter_ids)
+    income_df = _build_income_df(db, filter_ids)
+    cashflow_df = _build_cashflow_df(db, filter_ids)
 
-        if not repayment_df.empty:
-            delay_signals = detect_repayment_delays(repayment_df)
-            miss_signals = classify_misses(repayment_df)
-    except Exception:
-        logger.exception("Core rule execution failed")
-
-    history_signals = {}
-    try:
-        from core.rules.missing_history import detect_missing_history
-        history_signals = detect_missing_history(profiles_df, repayment_df)
-    except Exception:
-        logger.exception("Missing history rule failed")
-
-    # Build and store assessments
-    assessments = []
-    all_cids = set(profiles_df["customer_id"].astype(str).unique())
-    for cid in all_cids:
-        delay = delay_signals.get(cid)
-        miss = miss_signals.get(cid)
-        hist = history_signals.get(cid)
-
-        delay_score = delay.score if delay else 0.0
-        miss_score = miss.score if miss else 0.0
-        completeness_score = hist.completeness_score if hist else 100.0
-
-        # Weighted composite: delay 40%, miss 30%, completeness penalty 15%
-        incompleteness_risk = max(0, 100 - completeness_score)
-        warning_score = (
-            delay_score * 0.40
-            + miss_score * 0.30
-            + incompleteness_risk * 0.15
+    # Rules 1-4
+    delay_signals = miss_signals = {}
+    if not repayment_df.empty:
+        delay_signals = _run_signals("Repayment delay rule", detect_repayment_delays, repayment_df)
+        miss_signals = _run_signals("Miss classification rule", classify_misses, repayment_df)
+    exposure_signals = {}
+    if not exposure_df.empty:
+        # No separate balance history is ingested; the snapshots double as history.
+        exposure_signals = _run_signals(
+            "Exposure rule", detect_increasing_exposure, exposure_df, exposure_df, income_df,
         )
-        warning_score = min(max(warning_score, 0.0), 100.0)
+    history_signals = _run_signals(
+        "Missing history rule", detect_missing_history,
+        profiles_df, repayment_df, _build_loans_df(db, filter_ids), income_df,
+    )
+
+    # The models (and their gitignored .joblib files) are optional: the Docker image
+    # ships core/rules only, so a missing model degrades to the remaining signals.
+    def _load_cashflow():
+        from core.models.cashflow_model import load_cashflow_model, predict_cashflow_deterioration
+        return {"model": load_cashflow_model()[0], "predict": predict_cashflow_deterioration}
+
+    def _load_warning():
+        from core.models import warning_score_model as wsm
+        return {"model": wsm.load_warning_score_model()[0], "module": wsm}
+
+    # Model 1: cash-flow deterioration (needs >= 3 months per customer)
+    cashflow_signals = {}
+    cf = _run_signals("Cash-flow model load", _load_cashflow)
+    if cf and not cashflow_df.empty:
+        cashflow_signals = _run_signals("Cash-flow model", cf["predict"], cashflow_df, cf["model"])
+
+    # Model 2: final warning-score model on the same features it was trained on
+    income_by_cid = (
+        cashflow_df.sort_values("month").groupby("customer_id")["monthly_inflow"]
+        .apply(lambda s: s.tail(3).mean()).to_dict()
+        if not cashflow_df.empty else {}
+    )
+    model_results = {}
+    ws = _run_signals("Warning-score model load", _load_warning)
+    if ws:
+        latest_exposure = exposure_df
+        if not exposure_df.empty:
+            last_snap = exposure_df.groupby("customer_id")["snapshot_date"].transform("max")
+            latest_exposure = exposure_df[exposure_df["snapshot_date"] == last_snap]
+        model_results = _run_signals(
+            "Warning-score model",
+            lambda: ws["module"].predict_warning_scores(
+                ws["module"].platform_features(repayment_df, latest_exposure, income_by_cid), ws["model"],
+            ),
+        )
+
+    assessments = []
+    for cid in sorted(set(profiles_df["customer_id"].astype(str))):
+        delay, miss = delay_signals.get(cid), miss_signals.get(cid)
+        exposure, hist, cashflow = exposure_signals.get(cid), history_signals.get(cid), cashflow_signals.get(cid)
+
+        rule_scores = {
+            "delay": delay.score if delay else 0.0,
+            "miss": miss.score if miss else 0.0,
+            "exposure": exposure.score if exposure else 0.0,
+            "completeness": hist.completeness_score if hist else 100.0,
+            "cashflow": cashflow.score if cashflow else 0.0,
+        }
+
+        available = {
+            name: rule_scores[name]
+            for name, signal in (("delay", delay), ("miss", miss), ("exposure", exposure), ("cashflow", cashflow))
+            if signal is not None
+        }
+        model = model_results.get(cid)
+        if model is not None:
+            warning_score = model.warning_score
+            if cashflow is not None:
+                warning_score = (
+                    (1 - CASHFLOW_BLEND_WEIGHT) * model.warning_score + CASHFLOW_BLEND_WEIGHT * cashflow.score
+                )
+            score_source = "warning_score_model"
+        else:
+            # Model files absent (e.g. the Docker image): rule composite over the signals that ran.
+            total_weight = sum(SIGNAL_WEIGHTS[n] for n in available)
+            warning_score = (
+                sum(SIGNAL_WEIGHTS[n] * v for n, v in available.items()) / total_weight if total_weight else 0.0
+            )
+            score_source = "rule_composite"
+
+        # Data gaps are handled by the Insufficient Data tag, not by adding risk.
+        insufficient = hist is not None and not hist.risk_assessable
 
         indicators = []
+        if model is not None and not insufficient:
+            indicators.extend(model.indicators)
+        if insufficient:
+            # Lead with the data gaps: they, not delinquency, explain this customer.
+            indicators.extend(hist.indicators)
         if delay:
             indicators.extend(delay.indicators[:3])
         if miss:
             indicators.extend(miss.indicators[:2])
-        if hist and hist.indicators:
+        if exposure:
+            indicators.extend(exposure.indicators[:2])
+        if cashflow:
+            indicators.extend(cashflow.indicators[:2])
+        if hist and hist.indicators and not insufficient:
             indicators.extend(hist.indicators[:2])
 
-        risk_category = _score_to_category(warning_score)
+        risk_category = INSUFFICIENT_DATA if insufficient else _score_to_category(warning_score)
 
         cust = db.execute(select(Customer).where(Customer.customer_id == cid)).scalar_one_or_none()
         if not cust:
             continue
 
-        assessment = WarningAssessment(
-            customer_id=cust.id,
-            warning_score=round(warning_score, 2),
-            risk_category=risk_category,
-            rule_delay_score=round(delay_score, 2),
-            rule_miss_score=round(miss_score, 2),
-            rule_exposure_score=0.0,
-            rule_completeness_score=round(completeness_score, 2),
-            cashflow_score=0.0,
-            top_indicators=json.dumps(indicators),
-        )
-        db.add(assessment)
-        assessments.append({
-            "customer_id": cid,
+        row = {
             "warning_score": round(warning_score, 2),
             "risk_category": risk_category,
-            "rule_delay_score": round(delay_score, 2),
-            "rule_miss_score": round(miss_score, 2),
-            "rule_exposure_score": 0.0,
-            "rule_completeness_score": round(completeness_score, 2),
-            "cashflow_score": 0.0,
+            "rule_delay_score": round(rule_scores["delay"], 2),
+            "rule_miss_score": round(rule_scores["miss"], 2),
+            "rule_exposure_score": round(rule_scores["exposure"], 2),
+            "rule_completeness_score": round(rule_scores["completeness"], 2),
+            "cashflow_score": round(rule_scores["cashflow"], 2),
+        }
+        db.add(WarningAssessment(customer_id=cust.id, top_indicators=json.dumps(indicators), **row))
+        assessments.append({
+            "customer_id": cid,
+            **row,
             "top_indicators": indicators,
+            "signals_used": sorted(available),
+            "score_source": score_source,
+            "model_warning_score": model.warning_score if model else None,
+            "model_default_probability": model.default_probability if model else None,
+            "model_top_contributors": model.top_contributors if model else [],
         })
 
     db.commit()
@@ -441,7 +615,7 @@ def get_watchlist(
             risk_category=wa.risk_category,
             top_indicators=indicators[:3],
             active_signals=active_signals,
-            monitoring_status="Active",
+            monitoring_status=INSUFFICIENT_DATA if wa.risk_category == INSUFFICIENT_DATA else "Active",
         ))
 
     return WatchlistResponse(
@@ -564,7 +738,38 @@ def explain_customer(customer_id: str, request: Request, db: Session = Depends(g
         "cashflow": assessment.cashflow_score,
     }
 
-    settings = request.app.state.settings
+    # One instalment per loan + due date (re-uploads append duplicate rows).
+    repayments = list({
+        (loan_id, due): (due, dpd)
+        for loan_id, due, dpd in db.execute(
+            select(RepaymentRecord.loan_id, RepaymentRecord.due_date, RepaymentRecord.dpd)
+            .join(LoanFacility, LoanFacility.id == RepaymentRecord.loan_id)
+            .where(LoanFacility.customer_id == cust.id)
+            .order_by(RepaymentRecord.id)
+        ).all()
+    }.values())
+    loans = db.execute(select(LoanFacility).where(LoanFacility.customer_id == cust.id)).scalars().all()
+    has_income = db.execute(
+        select(func.count(func.distinct(CashFlowRecord.month))).where(CashFlowRecord.customer_id == cust.id)
+    ).scalar() or 0
+    has_exposure = db.execute(
+        select(func.count(CustomerExposure.id)).where(CustomerExposure.customer_id == cust.id)
+    ).scalar() or 0
+    not_evaluated = set()
+    if not has_exposure:
+        not_evaluated.add("exposure")
+    if has_income < 3 or not assessment.cashflow_score:
+        not_evaluated.add("cashflow")  # the model needs >= 3 months of cash flow
+    facts = {
+        "repayment_records": len(repayments),
+        "late_payments": sum(1 for _, dpd in repayments if (dpd or 0) > 0),
+        "max_dpd": max((dpd or 0 for _, dpd in repayments), default=0),
+        "first_due_date": min((d for d, _ in repayments), default=None),
+        "last_due_date": max((d for d, _ in repayments), default=None),
+        "active_loans": len(loans),
+        "total_outstanding": round(sum(l.outstanding_balance for l in loans), 2),
+        "income_data_on_file": bool(has_income),
+    }
 
     result = explain_assessment(
         customer_id=customer_id,
@@ -572,7 +777,10 @@ def explain_customer(customer_id: str, request: Request, db: Session = Depends(g
         risk_category=assessment.risk_category,
         rule_scores=rule_scores,
         top_indicators=indicators,
-        settings=settings,
+        facts=facts,
+        insufficient_data=assessment.risk_category == INSUFFICIENT_DATA,
+        not_evaluated=not_evaluated,
+        settings=request.app.state.settings,
     )
 
     return ExplainResponse(**result)
@@ -603,13 +811,16 @@ def portfolio_summary(db: Session = Depends(get_db)):
     ).scalars().all()
 
     total_assessed = len(latest_assessments)
-    avg_score = sum(a.warning_score for a in latest_assessments) / total_assessed if total_assessed else 0.0
+    # Provisional scores of thin-file customers are not risk ratings: keep them out
+    # of the average and the top-risk list.
+    scored = [a for a in latest_assessments if a.risk_category != INSUFFICIENT_DATA]
+    avg_score = sum(a.warning_score for a in scored) / len(scored) if scored else 0.0
 
-    distribution: dict[str, int] = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0}
+    distribution: dict[str, int] = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0, INSUFFICIENT_DATA: 0}
     for a in latest_assessments:
         distribution[a.risk_category] = distribution.get(a.risk_category, 0) + 1
 
-    sorted_assessments = sorted(latest_assessments, key=lambda a: -a.warning_score)[:5]
+    sorted_assessments = sorted(scored, key=lambda a: -a.warning_score)[:5]
     top_risky = []
     for a in sorted_assessments:
         cust = db.execute(select(Customer).where(Customer.id == a.customer_id)).scalar_one_or_none()

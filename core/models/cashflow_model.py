@@ -108,7 +108,8 @@ def extract_cashflow_features(cashflow_df: pd.DataFrame) -> pd.DataFrame:
         group = group.sort_values("month")
         inflows = group["monthly_inflow"].values
         n = len(inflows)
-        is_declining = group["is_declining"].iloc[0]
+        # Training label; absent when scoring real customers.
+        is_declining = group["is_declining"].iloc[0] if "is_declining" in group else 0
 
         if n < 3:
             continue
@@ -227,6 +228,20 @@ def train_cashflow_model(app_path: str, n_customers: int = 200000) -> dict:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": model, "features": FEATURE_COLS, "auc": auc}, MODEL_PATH)
     print(f"  Saved to {MODEL_PATH}", flush=True)
+    import json, time
+    (MODEL_DIR / "cashflow_model.metrics.json").write_text(json.dumps({
+        "dataset": "Synthetic 12-month cash flows generated from Home Credit application_train "
+                   "(income, annuity, TARGET)",
+        "customers": int(features_df["customer_id"].nunique()),
+        "split_train_test": [int(len(X_train)), int(len(X_test))],
+        "declining_share": round(float(features_df["is_declining"].mean()), 4),
+        "algorithm": "scikit-learn GradientBoostingClassifier",
+        "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1,
+                   "subsample": 0.8, "min_samples_leaf": 20},
+        "test_auc": round(float(auc), 4),
+        "feature_importance": [{"feature": f, "importance": round(float(i), 4)} for f, i in importances],
+        "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }, indent=2) + "\n")
 
     print("\n" + "=" * 60)
     print(f"TRAINING COMPLETE — AUC: {auc:.4f}")
@@ -304,4 +319,4 @@ def predict_cashflow_deterioration(
 
 if __name__ == "__main__":
     APP_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "application_train.csv")
-    train_cashflow_model(APP_PATH)
+    train_cashflow_model(APP_PATH, n_customers=307511)  # every Home Credit applicant

@@ -210,3 +210,8 @@ class ExplainResponse(BaseModel):
     customer_id: str
     explanation: str
     contributing_factors: list[dict]
+    risk_factors: list[str] = []
+    recommended_actions: list[str] = []
+    data_status: str = "assessable"  # "assessable" | "insufficient"
+    source: str = "fallback"  # "ai" | "fallback"
+    model: str | None = None

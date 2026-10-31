@@ -300,9 +300,13 @@ curl --fail-with-body -X POST "$BASE_URL/api/v1/ews/assess?customer_id=DOC-C001"
 
 Response: `200 OK`, an object with `total_assessed` and an `assessments` array. Each item contains external `customer_id`, numeric `warning_score`, `risk_category`, `rule_delay_score`, `rule_miss_score`, `rule_exposure_score`, `rule_completeness_score`, `cashflow_score`, and `top_indicators` (string array). IDs/timestamps are retrieved separately through customer detail. The array has no guaranteed order.
 
-Current score: `0.40 × delay + 0.30 × miss + 0.15 × max(0, 100 − completeness)`, clamped to 0–100 and stored rounded to two decimal places. Category is computed before rounding: `Low` below 20, `Medium` from 20 to below 45, `High` from 45 to below 70, otherwise `Critical`.
+Current score: `0.75 × model score + 0.25 × cashflow_score` when the cash-flow model ran (at least 3 distinct months of cash flow), otherwise the model score alone. The model score comes from `core/models/warning_score_model.py`, an XGBoost classifier trained only on Home Credit (all 307,511 customers, test AUC 0.678; see `core/models/saved/warning_score_model.metrics.json`). Its calibrated default probability ÷ the 8.07% baseline (lift) is mapped piecewise onto 0–100: lift 1.15 → 20, 1.35 → 45, 1.65 → 70, 4.0 → 100. When the model files are absent, the score falls back to `(0.30 × delay + 0.20 × miss + 0.25 × exposure + 0.25 × cashflow) / (sum of weights of the signals that ran)`. Rule scores are stored for explanation; they are not model inputs. Category: `Low` below 20, `Medium` from 20 to below 45, `High` from 45 to below 70, otherwise `Critical`.
 
-**Current limitations:** this route runs repayment-delay, miss-classification, and missing-history rules only. Exposure and cashflow scores remain `0.0`, even after those tables are uploaded; the missing-history invocation receives only profiles and repayments, not uploaded loan/exposure/cashflow tables. Rule exceptions are logged and can still produce `200` using defaults (delay/miss `0`, completeness `100` when the corresponding signal is absent). A successful response is not proof that every rule ran or that the result is a validated lending decision.
+**Insufficient data:** when the missing-history rule finds the file too thin to rate (completeness below 50, or fewer than 6 distinct instalment due dates), `risk_category` is `Insufficient Data` instead of a risk band. The provisional `warning_score` is still stored for audit but is not a risk rating, and `top_indicators` lead with the data gaps.
+
+Each response item also carries `signals_used` (which of `delay`, `miss`, `exposure`, `cashflow` ran), `score_source` (`warning_score_model` or `rule_composite`), `model_warning_score` and `model_default_probability` (null when the model files are absent), and `model_top_contributors` (per-customer XGBoost feature contributions). The model's probability and main drivers are also added to `top_indicators`.
+
+Inputs: repayments are de-duplicated per loan and due date, exposure rows per identical record, and cash flow per customer and month before scoring. The models load from the gitignored `core/models/saved/*.joblib`; the Docker image copies `core/rules` only, so deployed instances score without the cash-flow signal. Rule or model exceptions are logged and the remaining signals still produce `200`. A successful response is not proof that every rule ran or that the result is a validated lending decision.
 
 Error: `404` with `{"detail":"No customers found"}` when no selected customers exist.
 
@@ -312,14 +316,14 @@ Return latest assessments, sorted by descending warning score. No body or authen
 
 | Query | Default | Behavior |
 | --- | --- | --- |
-| `risk_level` | null | Exact, case-sensitive category match, normally `Low`, `Medium`, `High`, `Critical`; not an enum validator |
+| `risk_level` | null | Exact, case-sensitive category match, normally `Low`, `Medium`, `High`, `Critical`, `Insufficient Data`; not an enum validator |
 | `customer_segment` | null | Exact match on customer `portfolio_segment` |
 | `product_type` | null | **Echoed in filters only; currently does not filter results** |
 | `min_score` | `0.0` | Numeric inclusive lower bound, no 0–100 validation |
 | `limit` | `50` | Integer 1–1000 |
 | `offset` | `0` | Integer ≥ 0 |
 
-Response: `200 OK`, `WatchlistResponse`: `items`, `total` (matching rows before pagination), and `filters`. Each item has external `customer_id`, `product_type`, `outstanding_exposure`, `warning_score`, `risk_category`, up to three `top_indicators`, integer `active_signals`, and `monitoring_status: "Active"`. Product and exposure come from the single loan with the largest outstanding balance, **not** summed facilities or uploaded exposure records; absent loans yield `""` and `0.0`.
+Response: `200 OK`, `WatchlistResponse`: `items`, `total` (matching rows before pagination), and `filters`. Each item has external `customer_id`, `product_type`, `outstanding_exposure`, `warning_score`, `risk_category`, up to three `top_indicators`, integer `active_signals`, and `monitoring_status` (`"Active"`, or `"Insufficient Data"` for thin-file customers). Product and exposure come from the single loan with the largest outstanding balance, **not** summed facilities or uploaded exposure records; absent loans yield `""` and `0.0`.
 
 `active_signals` counts delay, miss, exposure, and cashflow scores strictly greater than 20; it excludes completeness. `filters.max_results` echoes the effective `limit`, alongside the four filter values; there is no returned `offset` or `has_more`. No assessed customers yields an empty array and total zero. Invalid numeric pagination/filter inputs return `422`.
 
@@ -363,9 +367,9 @@ Errors: `404` with `{"detail":"Assessment not found"}`; `422` for invalid decisi
 
 Explain the latest stored assessment for an **external** customer ID. No request body or authentication. This does not run an assessment or persist an explanation.
 
-Response: `200 OK`, `ExplainResponse`: external `customer_id`, `explanation` (string), and `contributing_factors` (array of objects with `signal` and numeric `score`). Signals are `repayment_delay`, `miss_classification`, `exposure`, `data_completeness`, and `cashflow`, included only when their score is greater than zero. Completeness is a data-quality score, not a risk score; the current explanation picks the largest raw score as the top driver, which may be completeness. Treat the narrative as advisory, not independently validated risk reasoning.
+Response: `200 OK`, `ExplainResponse`: external `customer_id`; `explanation` (plain-text summary); `risk_factors` and `recommended_actions` (string arrays); `data_status` (`assessable` or `insufficient`); `source` (`ai` or `fallback`); `model` (model ID when `source` is `ai`, else null); and `contributing_factors` (array of objects with `signal` and numeric `score`). Signals are `repayment_delay`, `miss_classification`, `exposure`, and `cashflow`, included only when their score is greater than zero; `data_completeness` is excluded because it is a data-quality score, not a risk score. Treat the narrative as advisory, not independently validated risk reasoning.
 
-With no `NEBIUS_API_KEY`, the service uses a local template. With a key, it requests an AI explanation through the configured Nebius endpoint/model. Provider failures fall back to the template and still return `200`; the response has no field distinguishing generated from fallback text. A configured provider receives a prompt containing the customer identifier, warning score/category, top driver, and up to three indicators. Review data-sharing permissions before enabling it. Repeated requests can make repeated external calls; no response cache is implemented.
+With no `NEBIUS_API_KEY`, the service uses a local template. With a key, it requests a JSON-mode explanation through the configured Nebius endpoint/model (default `deepseek-ai/DeepSeek-V4-Flash-0731`, with thinking disabled for latency and a 20-second timeout). Provider failures fall back to the template and still return `200` with `source: "fallback"`. A configured provider receives a prompt containing the customer identifier, warning score/category, all rule scores, the stored indicators, and repayment facts (record count, late count, max DPD, first/last due dates, loan count, total outstanding, whether income data exists). Review data-sharing permissions before enabling it. Repeated requests can make repeated external calls; no response cache is implemented.
 
 Errors: `404` with `{"detail":"Customer not found"}` or `{"detail":"No assessment found for customer"}`. Equal latest timestamps have no deterministic tiebreaker.
 
@@ -377,9 +381,9 @@ Return a shared-portfolio summary. No query parameters, body, or authentication.
 | --- | --- |
 | `total_customers` | Count of all imported customers, including unassessed customers |
 | `total_assessed` | Count of latest-assessment rows, subject to the timestamp-tie caveat above |
-| `average_warning_score` | Mean of those assessment scores, rounded to two decimals; `0.0` if none |
-| `risk_distribution` | Category-to-count object with `Low`, `Medium`, `High`, `Critical` initialized to zero |
-| `top_risky_customers` | Up to five highest-score rows: external `customer_id`, `warning_score`, `risk_category`, and up to three `top_indicators` |
+| `average_warning_score` | Mean of rated assessment scores (excluding `Insufficient Data`), rounded to two decimals; `0.0` if none |
+| `risk_distribution` | Category-to-count object with `Low`, `Medium`, `High`, `Critical`, `Insufficient Data` initialized to zero |
+| `top_risky_customers` | Up to five highest-score rated rows (excluding `Insufficient Data`): external `customer_id`, `warning_score`, `risk_category`, and up to three `top_indicators` |
 
 This is not a sum of loan/exposure amounts. An empty database returns zero counts/scores and an empty top-customer array.
 
@@ -527,7 +531,8 @@ with isolated_app() as app, TestClient(app) as client:
     response = client.post("/api/v1/ews/assess", params={"customer_id": "DOC-C001"})
     assert response.status_code == 200 and response.json()["total_assessed"] == 1
     assessment = response.json()["assessments"][0]
-    assert assessment["rule_exposure_score"] == assessment["cashflow_score"] == 0.0
+    assert assessment["cashflow_score"] == 0.0  # the cash-flow model needs >= 3 months
+    assert assessment["risk_category"] == "Insufficient Data"  # one instalment is a thin file
 
     response = client.get("/api/v1/ews/customer/DOC-C001")
     assert response.status_code == 200
@@ -552,7 +557,7 @@ with isolated_app() as app, TestClient(app) as client:
     watchlist = response.json()
     assert watchlist["total"] == 1  # product_type is currently ignored by filtering
     assert watchlist["items"][0]["customer_id"] == "DOC-C001"
-    assert watchlist["items"][0]["monitoring_status"] == "Active"
+    assert watchlist["items"][0]["monitoring_status"] == "Insufficient Data"
     response = client.post("/api/v1/ews/explain/DOC-C001")
     assert response.status_code == 200 and response.json()["explanation"]
     response = client.get("/api/v1/ews/portfolio")

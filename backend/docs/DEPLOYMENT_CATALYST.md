@@ -46,18 +46,26 @@ mkdir -p .catalyst-artifacts
 docker save -o .catalyst-artifacts/credx-api.tar "credx-api:$(git rev-parse HEAD)"
 ```
 
-The root context is necessary because existing EWS routes import `core.rules`.
-Only `core/__init__.py` and `core/rules` accompany the backend; this is a shared
-backend dependency, not a separate service. The frontend, datasets, model files,
-tracked SQLite database, dotenv files, caches, and credentials are excluded.
-A root `.dockerignore` allowlists runtime inputs. Do not build with `backend/`
-as the context or copy the tracked `backend/data/credx.db` into the image.
+The root context is necessary because EWS routes import `core.rules` and
+`core.models`. The image carries `core/__init__.py`, `core/rules`, the model code
+`core/models/*.py` and the trained models `core/models/saved/*.joblib` (cash-flow
+and warning-score; without them scoring falls back to the rule composite). The
+tracked `backend/data/credx.db` is copied to `/app/seed/credx.db` as a **seed**.
+The frontend, raw datasets, training logs, dotenv files, caches, and credentials are
+excluded. A root `.dockerignore` allowlists these runtime inputs; do not build with
+`backend/` as the context.
 
 Startup is a shell CMD:
 
 ```sh
-umask 077; python -m alembic upgrade head && exec python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 9000
+umask 077; python -m app.db.bootstrap && python -m alembic upgrade head && exec python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 9000
 ```
+
+`app.db.bootstrap` never deletes data. If `DATABASE_URL` points at a missing or empty
+file, it copies the seed there (login sessions are revoked; user accounts are kept).
+If the database was built by `create_all` and has no `alembic_version` table, it
+stamps revision `0001` so the upgrade does not fail on existing tables. Override the
+seed location with `DB_SEED_PATH`.
 
 `&&` prevents Uvicorn starting after a failed migration. `exec` gives Uvicorn PID 1
 and SIGTERM. The Docker healthcheck uses `/health`. No secret is a Docker ARG,
@@ -294,8 +302,11 @@ behavior is preserved, not endorsed as a production schema management strategy.
 
 - AppSail documentation describes instance-local disk allocation, cold starts,
   replacement and automatic scale-down, but establishes no durable SQLite volume
-  contract. Treat `/app/data` as disposable. Users, sessions and uploads can be
-  lost on a restart, scale-down or redeployment. No existing database is uploaded.
+  contract. Treat `/app/data` as disposable. A new instance starts from the seed
+  (the `credx.db` committed at build time), so it is never empty; uploads, users and
+  sessions created after that are lost on a replacement, scale-down or redeployment.
+  To keep data, commit an updated `backend/data/credx.db` and redeploy, or move to a
+  durable database.
 - One Uvicorn worker does **not** mean one AppSail instance. AppSail can create
   multiple isolated instances; their SQLite files diverge. No supported single-
   instance control was established, and this workflow does not invent one.

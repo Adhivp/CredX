@@ -279,7 +279,14 @@ def _assess_completeness(
     )
 
     completeness = _score_to_completeness(completeness_score)
-    risk_assessable = completeness in (DataCompleteness.COMPLETE, DataCompleteness.ADEQUATE)
+    # rules.md: ADEQUATE needs >= 6 monthly instalments. Enforce that as a hard gate,
+    # so a thin file that scores well on other fields is not judged on 1-2 payments.
+    # Count distinct due dates: re-uploaded or duplicated rows must not add depth.
+    distinct_due_dates = repayment_hist["due_date"].nunique() if repayment_records_count else 0
+    risk_assessable = (
+        completeness in (DataCompleteness.COMPLETE, DataCompleteness.ADEQUATE)
+        and distinct_due_dates >= MIN_RECORDS_FOR_ADEQUATE
+    )
 
     return MissingHistorySignal(
         customer_id=customer_id,

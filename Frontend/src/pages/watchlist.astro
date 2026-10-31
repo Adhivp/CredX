@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import ScoreMethodology from "../components/dashboard/ScoreMethodology.astro";
 ---
 
 <Layout title="CredX — Watchlist">
@@ -20,6 +21,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
             <option value="Medium">Medium</option>
             <option value="High">High</option>
             <option value="Critical">Critical</option>
+            <option value="Insufficient Data">Insufficient data</option>
           </select>
         </div>
         <div class="form-group">
@@ -28,6 +30,8 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
         </div>
         <button id="applyFilter" class="btn btn-secondary">Apply Filters</button>
       </div>
+
+      <ScoreMethodology />
 
       <div id="watchlistContent">
         <div class="loading">Loading watchlist…</div>
@@ -49,7 +53,7 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
     const minScore = document.getElementById('filterScore').value;
 
     let url = `${API}/watchlist?min_score=${minScore}&limit=100`;
-    if (risk) url += `&risk_category=${risk}`;
+    if (risk) url += `&risk_level=${encodeURIComponent(risk)}`;
 
     try {
       const res = await fetch(url);
@@ -68,17 +72,20 @@ import DashboardNav from "../components/dashboard/DashboardNav.astro";
     }
 
     const rows = data.items.map(item => {
-      const badgeCls = `badge-${item.risk_category.toLowerCase()}`;
+      const insufficient = item.risk_category === 'Insufficient Data';
+      const badgeCls = insufficient ? 'badge-insufficient' : `badge-${item.risk_category.toLowerCase()}`;
       const indicators = (item.top_indicators || []).slice(0, 2).join('<br>');
       const outstanding = item.outstanding_exposure ? `₹${(item.outstanding_exposure / 1000).toFixed(0)}K` : '—';
       return `<tr class="clickable" onclick="window.location='/customer/${item.customer_id}'">
         <td class="mono">${item.customer_id}</td>
         <td>${item.product_type || '—'}</td>
         <td class="mono">${outstanding}</td>
-        <td class="score-cell">${item.warning_score.toFixed(1)}</td>
+        <td class="score-cell">${insufficient
+          ? `<span class="score-blur" aria-hidden="true">${item.warning_score.toFixed(1)}</span><span class="sr-only">Not rated</span>`
+          : item.warning_score.toFixed(1)}</td>
         <td><span class="badge ${badgeCls}">${item.risk_category}</span></td>
         <td style="font-size:0.75rem;max-width:300px;">${indicators || '—'}</td>
-        <td><span class="badge ${item.monitoring_status === 'Active' ? 'badge-low' : 'badge-medium'}">${item.monitoring_status}</span></td>
+        <td><span class="badge ${item.monitoring_status === 'Active' ? 'badge-low' : 'badge-insufficient'}">${item.monitoring_status}</span></td>
       </tr>`;
     }).join('');
 

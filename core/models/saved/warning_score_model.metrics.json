@@ -1,0 +1,193 @@
+{
+  "dataset": "Home Credit Default Risk (Kaggle): application_train, installments_payments, bureau, credit_card_balance",
+  "customers": 307511,
+  "split_train_validation_test": [
+    215249,
+    46135,
+    46127
+  ],
+  "baseline_default_rate": 0.0807,
+  "algorithm": "XGBoost XGBClassifier (hist)",
+  "trees": 430,
+  "params": {
+    "learning_rate": 0.03,
+    "max_depth": 5,
+    "min_child_weight": 50,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 2.0
+  },
+  "test_auc": 0.6777,
+  "test_gini": 0.3554,
+  "test_brier": 0.0715,
+  "bands_on_test": {
+    "Low": {
+      "share": 0.7125,
+      "observed_default_rate": 0.0541
+    },
+    "Medium": {
+      "share": 0.0782,
+      "observed_default_rate": 0.1026
+    },
+    "High": {
+      "share": 0.078,
+      "observed_default_rate": 0.119
+    },
+    "Critical": {
+      "share": 0.1314,
+      "observed_default_rate": 0.1893
+    }
+  },
+  "calibration_by_decile": [
+    {
+      "decile": 1,
+      "predicted": 0.0296,
+      "observed": 0.0295
+    },
+    {
+      "decile": 2,
+      "predicted": 0.0383,
+      "observed": 0.0377
+    },
+    {
+      "decile": 3,
+      "predicted": 0.0449,
+      "observed": 0.0412
+    },
+    {
+      "decile": 4,
+      "predicted": 0.0523,
+      "observed": 0.0531
+    },
+    {
+      "decile": 5,
+      "predicted": 0.0611,
+      "observed": 0.0605
+    },
+    {
+      "decile": 6,
+      "predicted": 0.0716,
+      "observed": 0.0703
+    },
+    {
+      "decile": 7,
+      "predicted": 0.0835,
+      "observed": 0.0804
+    },
+    {
+      "decile": 8,
+      "predicted": 0.1002,
+      "observed": 0.1026
+    },
+    {
+      "decile": 9,
+      "predicted": 0.1272,
+      "observed": 0.1236
+    },
+    {
+      "decile": 10,
+      "predicted": 0.1997,
+      "observed": 0.2085
+    }
+  ],
+  "feature_importance_gain": [
+    {
+      "feature": "late_ratio_recent",
+      "gain": 50.4
+    },
+    {
+      "feature": "revolving_utilisation",
+      "gain": 34.98
+    },
+    {
+      "feature": "active_loans",
+      "gain": 23.15
+    },
+    {
+      "feature": "history_span_months",
+      "gain": 16.06
+    },
+    {
+      "feature": "late_ratio",
+      "gain": 15.18
+    },
+    {
+      "feature": "utilisation_ratio",
+      "gain": 14.04
+    },
+    {
+      "feature": "shortfall_ratio",
+      "gain": 11.42
+    },
+    {
+      "feature": "avg_days_late",
+      "gain": 10.86
+    },
+    {
+      "feature": "underpaid_ratio",
+      "gain": 9.85
+    },
+    {
+      "feature": "days_late_trend",
+      "gain": 9.54
+    },
+    {
+      "feature": "debt_to_income",
+      "gain": 9.04
+    },
+    {
+      "feature": "max_days_late",
+      "gain": 8.5
+    },
+    {
+      "feature": "n_instalments",
+      "gain": 8.13
+    },
+    {
+      "feature": "payment_to_income",
+      "gain": 8.13
+    },
+    {
+      "feature": "instalment_to_income",
+      "gain": 7.77
+    },
+    {
+      "feature": "loan_count",
+      "gain": 7.0
+    },
+    {
+      "feature": "max_late_streak",
+      "gain": 6.6
+    },
+    {
+      "feature": "recovery_rate",
+      "gain": 6.29
+    },
+    {
+      "feature": "severe_late_ratio",
+      "gain": 5.57
+    }
+  ],
+  "features": [
+    "n_instalments",
+    "late_ratio",
+    "late_ratio_recent",
+    "severe_late_ratio",
+    "max_days_late",
+    "avg_days_late",
+    "max_late_streak",
+    "recovery_rate",
+    "underpaid_ratio",
+    "shortfall_ratio",
+    "days_late_trend",
+    "history_span_months",
+    "loan_count",
+    "instalment_to_income",
+    "active_loans",
+    "utilisation_ratio",
+    "revolving_utilisation",
+    "debt_to_income",
+    "payment_to_income"
+  ],
+  "trained_at": "2026-10-31 15:40:53"
+}

@@ -813,6 +813,43 @@
             },
             "type": "array",
             "title": "Contributing Factors"
+          },
+          "risk_factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risk Factors",
+            "default": []
+          },
+          "recommended_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Actions",
+            "default": []
+          },
+          "data_status": {
+            "type": "string",
+            "title": "Data Status",
+            "default": "assessable"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "fallback"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           }
         },
         "type": "object",

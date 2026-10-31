@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import ScoreMethodology from "../../components/dashboard/ScoreMethodology.astro";
 
 const { id } = Astro.params;
 ---
@@ -16,6 +17,7 @@ const { id } = Astro.params;
       <div id="customerContent">
         <div class="loading">Loading customer data…</div>
       </div>
+      <ScoreMethodology />
     </main>
   </div>
 </Layout>
@@ -36,6 +38,22 @@ const { id } = Astro.params;
     }
   }
 
+  const INSUFFICIENT = 'Insufficient Data';
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const badgeClass = (cat) => cat === INSUFFICIENT ? 'badge-insufficient' : `badge-${String(cat).toLowerCase()}`;
+
+  const RULE_NOTE = ' Shown to explain the signal; the final score comes from the warning-score model, which reads the same data directly.';
+  const TIPS = {
+    delay: 'Rule 1 (0–100, higher = worse). Late-payment ratio up to 30 pts, max days past due up to 20, consecutive late payments up to 15, average days late, DPD trend and partial payments up to 10 each, 12-month context up to 5.' + RULE_NOTE,
+    miss: 'Rule 2 (0–100, higher = worse). Recovery rate up to 30 pts, longest late streak up to 25, miss frequency up to 15, recency and clustering up to 10 each, minus up to 10 for holiday or month-end delays. Below 25 = temporary, 25–50 = inconclusive, above 50 = sustained.' + RULE_NOTE,
+    exposure: 'Rule 3 (0–100, higher = worse). Utilisation up to 25 pts, card or overdraft utilisation up to 20, active loans and debt-to-income up to 15 each, new loans in 3 months and balance trend up to 10 each. Needs uploaded exposure data.' + RULE_NOTE,
+    cashflow: 'Model 1 (0–100) = probability × 100 that monthly inflow is in sustained decline. Gradient boosting (scikit-learn, 200 trees) on 12 trend features, trained on synthetic cash flows for 200,000 Home Credit applicants (AUC 0.88). Needs at least 3 months. 25% of the final score.',
+    quality: 'Rule 4 (0–100, higher = more complete). Repayment records up to 35 pts, loan and credit-limit data up to 20, months of history up to 15, income and DPD fields, freshness and coverage up to 10 each. Below 50, or fewer than 6 months of instalments, the customer is tagged Insufficient Data.',
+    score: 'Final = 0.75 × model score + 0.25 × cash-flow score (model score alone if under 3 months of cash flow). The model score comes from an XGBoost model trained on all 307,511 Home Credit customers (test AUC 0.678): predicted default probability ÷ 8.07% baseline, mapped to Low < 20, Medium 20–45, High 45–70, Critical ≥ 70.',
+  };
+  const notEvaluated = '<span style="color:var(--text-muted);font-size:0.875rem;">Not evaluated</span>';
+  const tip = (key) => `<span class="info-tip" tabindex="0" role="img" aria-label="${esc(TIPS[key])}" title="${esc(TIPS[key])}">i</span>`;
+
   function gaugeColor(score) {
     if (score < 20) return '#22C55E';
     if (score < 45) return '#F59E0B';
@@ -46,10 +64,12 @@ const { id } = Astro.params;
   function renderCustomer(data, container) {
     const c = data.customer || {};
     const assessments = data.assessments || [];
-    const latest = assessments.length > 0 ? assessments[assessments.length - 1] : null;
+    // The API returns assessments newest first.
+    const latest = assessments.length > 0 ? assessments[0] : null;
     const score = latest ? latest.warning_score : 0;
     const category = latest ? latest.risk_category : 'N/A';
-    const color = gaugeColor(score);
+    const insufficient = category === INSUFFICIENT;
+    const color = insufficient ? '#94A3B8' : gaugeColor(score);
     const deg = (score / 100) * 360;
 
     const loans = data.loans || [];
@@ -64,12 +84,17 @@ const { id } = Astro.params;
         <div class="profile-card">
           <div class="score-gauge" style="background:conic-gradient(${color} ${deg}deg, var(--border-subtle) ${deg}deg)">
             <div class="score-gauge-inner">
-              <div class="score-gauge-value" style="color:${color}">${score.toFixed(0)}</div>
-              <div class="score-gauge-label">Warning Score</div>
+              <div class="score-gauge-value ${insufficient ? 'score-blur' : ''}" style="color:${color}" ${insufficient ? 'aria-hidden="true"' : ''}>${score.toFixed(0)}</div>
+              <div class="score-gauge-label">${insufficient ? 'Provisional score' : 'Warning Score'} ${tip('score')}</div>
             </div>
           </div>
           <div style="text-align:center;margin-bottom:1rem;">
-            <span class="badge badge-${category.toLowerCase()}" style="font-size:0.8rem;">${category}</span>
+            <span class="badge ${badgeClass(category)}" style="font-size:0.8rem;">${esc(category)}</span>
+            ${insufficient ? `<div class="thin-file-note">
+              <strong>Not enough data to rate this customer.</strong> The risk is unknown, not low. The
+              score is provisional and should not drive decisions until more repayment history and
+              income evidence are on file.
+            </div>` : ''}
           </div>
           <dl>
             <div class="profile-card-field"><dt>Customer ID</dt><dd>${c.customer_id || customerId}</dd></div>
@@ -83,17 +108,18 @@ const { id } = Astro.params;
           <div class="data-table-wrap" style="margin-bottom:1rem;">
             <h3>Warning Indicators</h3>
             <div style="padding:1rem;">
-              ${indicators.length > 0 ? `<ul class="ai-factors">${indicators.map(i => `<li>${i}</li>`).join('')}</ul>` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No active warning indicators</div>'}
+              ${indicators.length > 0 ? `<ul class="ai-factors">${indicators.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No active warning indicators</div>'}
             </div>
           </div>
 
           <!-- Rule Scores -->
           ${latest ? `
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1rem;">
-            <div class="stat-card"><div class="stat-card-label">Delay Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_delay_score||0).toFixed(0)}</div></div>
-            <div class="stat-card"><div class="stat-card-label">Miss Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_miss_score||0).toFixed(0)}</div></div>
-            <div class="stat-card"><div class="stat-card-label">Exposure Score</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_exposure_score||0).toFixed(0)}</div></div>
-            <div class="stat-card"><div class="stat-card-label">Data Quality</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_completeness_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Delay Score ${tip('delay')}</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_delay_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Miss Score ${tip('miss')}</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_miss_score||0).toFixed(0)}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Exposure Score ${tip('exposure')}</div><div class="stat-card-value" style="font-size:1.25rem;">${latest.rule_exposure_score ? latest.rule_exposure_score.toFixed(0) : notEvaluated}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Cash Flow ${tip('cashflow')}</div><div class="stat-card-value" style="font-size:1.25rem;">${latest.cashflow_score ? latest.cashflow_score.toFixed(0) : notEvaluated}</div></div>
+            <div class="stat-card"><div class="stat-card-label">Data Quality ${tip('quality')}</div><div class="stat-card-value" style="font-size:1.25rem;">${(latest.rule_completeness_score||0).toFixed(0)}</div></div>
           </div>` : ''}
         </div>
       </div>`;
@@ -170,7 +196,7 @@ const { id } = Astro.params;
           <thead><tr><th>Decision</th><th>Reason</th><th>Original Score</th><th>Analyst</th><th>Date</th></tr></thead>
           <tbody>${alerts.map(a => `<tr>
             <td><span class="badge badge-medium">${a.decision}</span></td>
-            <td>${a.reason || '—'}</td>
+            <td>${esc(a.reason) || '—'}</td>
             <td class="mono">${a.original_score?.toFixed(1) || '—'}</td>
             <td>${a.analyst_id || '—'}</td>
             <td class="mono">${a.created_at ? new Date(a.created_at * 1000).toLocaleDateString() : '—'}</td>
@@ -193,15 +219,23 @@ const { id } = Astro.params;
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = await res.json();
 
-        let html = `<p class="ai-explanation">${result.explanation || 'No explanation generated.'}</p>`;
+        const heading = (t) => `<h4 style="margin-top:0.75rem;font-size:0.75rem;color:var(--gold-500);text-transform:uppercase;letter-spacing:0.05em;">${t}</h4>`;
+        let html = '';
+        if (result.data_status === 'insufficient') {
+          html += `<span class="badge badge-insufficient" style="margin-bottom:0.5rem;">Unknown risk: thin file</span>`;
+        }
+        html += `<p class="ai-explanation">${esc(result.explanation || 'No explanation generated.')}</p>`;
         if (result.risk_factors && result.risk_factors.length) {
-          html += `<h4 style="margin-top:0.75rem;font-size:0.75rem;color:var(--gold-500);text-transform:uppercase;letter-spacing:0.05em;">Risk Factors</h4>`;
-          html += `<ul class="ai-factors">${result.risk_factors.map(f => `<li>${f}</li>`).join('')}</ul>`;
+          html += heading(result.data_status === 'insufficient' ? 'Data Gaps' : 'Risk Factors');
+          html += `<ul class="ai-factors">${result.risk_factors.map(f => `<li>${esc(f)}</li>`).join('')}</ul>`;
         }
         if (result.recommended_actions && result.recommended_actions.length) {
-          html += `<h4 style="margin-top:0.75rem;font-size:0.75rem;color:var(--gold-500);text-transform:uppercase;letter-spacing:0.05em;">Recommended Actions</h4>`;
-          html += `<ul class="ai-factors">${result.recommended_actions.map(a => `<li>${a}</li>`).join('')}</ul>`;
+          html += heading('Recommended Actions');
+          html += `<ul class="ai-factors">${result.recommended_actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>`;
         }
+        html += `<div class="ai-meta">${result.source === 'ai'
+          ? `Generated by ${esc(result.model)}. It explains the score and does not change it.`
+          : 'AI unavailable: showing the rule-based explanation.'}</div>`;
         out.innerHTML = html;
       } catch (err) {
         out.textContent = `Error: ${err.message}`;

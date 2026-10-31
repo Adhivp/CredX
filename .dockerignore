@@ -12,6 +12,10 @@
 !core/__init__.py
 !core/rules/
 !core/rules/**
+!core/models/
+!core/models/*.py
+!core/models/saved/
+!core/models/saved/*.joblib
 **/__pycache__
 **/*.py[cod]
 **/.env
@@ -21,3 +25,6 @@
 **/*.pem
 **/*.key
 **/*.log
+# Seed database only (copied to /app/seed, see backend/Dockerfile); must stay last.
+!backend/data/
+!backend/data/credx.db

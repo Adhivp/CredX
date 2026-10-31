@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
+from sqlalchemy.engine import make_url
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -21,3 +22,16 @@ class Settings(BaseSettings):
     nebius_api_key: str = ""
     nebius_base_url: str = "https://api.tokenfactory.us-central1.nebius.com/v1/"
     nebius_model: str = "deepseek-ai/DeepSeek-V4-Flash-0731"
+
+    @field_validator("database_url")
+    @classmethod
+    def anchor_relative_sqlite(cls, v: str) -> str:
+        # A relative path like sqlite:///./data/credx.db would otherwise resolve
+        # against the shell's cwd, so starting the server from another directory
+        # silently opens a new, empty database.
+        url = make_url(v)
+        if url.get_backend_name() == "sqlite" and url.database and url.database != ":memory:":
+            path = Path(url.database)
+            if not path.is_absolute():
+                return url.set(database=str((BACKEND_DIR / path).resolve())).render_as_string(hide_password=False)
+        return v

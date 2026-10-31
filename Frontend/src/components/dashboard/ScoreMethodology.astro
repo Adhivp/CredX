@@ -1,0 +1,187 @@
+---
+// "How scores are calculated": mirrors backend/app/api/v1/ews.py (run_assessment),
+// core/rules/* and core/models/*. Numbers come from
+// core/models/saved/warning_score_model.metrics.json; update them after retraining.
+interface Props {
+  open?: boolean;
+}
+const { open = false } = Astro.props;
+
+const bands = [
+  { cls: "badge-low", name: "Low", range: "< 20", lift: "under 1.15× baseline", share: "71.3%", observed: "5.4%" },
+  { cls: "badge-medium", name: "Medium", range: "20–45", lift: "1.15–1.35×", share: "7.8%", observed: "10.3%" },
+  { cls: "badge-high", name: "High", range: "45–70", lift: "1.35–1.65×", share: "7.8%", observed: "11.9%" },
+  { cls: "badge-critical", name: "Critical", range: "≥ 70", lift: "over 1.65×", share: "13.1%", observed: "18.9%" },
+];
+
+const models = [
+  {
+    name: "Warning-score model",
+    status: "In use: 75% of the final score",
+    role: "Predicts the probability that the customer defaults. This is the main score.",
+    algorithm: "XGBoost classifier (xgboost, hist): 430 trees, depth 5, learning rate 0.03. No class re-weighting, so the probabilities stay calibrated",
+    data: "Home Credit Default Risk (Kaggle) only: all 307,511 customers. The data was converted to the CredX format first: 11.6M payment rows became 10.95M instalments, and 1.55M bureau and card records became credit facilities. Split 70 / 15 / 15 into train / validation / test",
+    features: "19 features, computed by the same code in training and in production: late-payment share overall and in the last 6 instalments, payments over 30 days late, worst and average days late, lateness trend, late streak, recovery rate, partial payments, shortfall, history length, loan count, active loans, utilisation, card/overdraft utilisation, debt-to-income, payment-to-income, instalment-to-income",
+    quality: "Test AUC 0.678 (Gini 0.355) on 46,127 held-out customers. Calibrated: in the riskiest 10%, the predicted default rate was 20.0% and the observed rate 20.9%",
+    file: "core/models/saved/warning_score_model.joblib",
+  },
+  {
+    name: "Cash-flow deterioration model",
+    status: "In use: 25% of the final score",
+    role: "Probability that monthly inflow is in sustained decline. Home Credit has no cash-flow data, so the main model cannot learn this signal and it is added separately.",
+    algorithm: "Gradient Boosting Classifier (scikit-learn): 200 trees, depth 5, learning rate 0.1",
+    data: "Synthetic 12-month cash-flow series generated for 200,000 Home Credit applicants, labelled by actual default. Not yet validated on real bank data",
+    features: "12 trend features: 3- and 6-month slope, volatility, % change, min/mean ratio, share of declining months, current vs peak, recent average inflow, consistency",
+    quality: "AUC 0.88 on held-out synthetic data. Needs at least 3 months of cash flow",
+    file: "core/models/saved/cashflow_model.joblib",
+  },
+  {
+    name: "AI explanation",
+    status: "In use",
+    role: "Writes the plain-English explanation. It explains the score but never changes it.",
+    algorithm: "DeepSeek V4 Flash (deepseek-ai/DeepSeek-V4-Flash-0731) via Nebius Token Factory; JSON output, thinking off",
+    data: "Not trained on your data. Each request sends only the stored scores, signals and repayment facts for one customer",
+    features: "",
+    quality: "If the model is unavailable, a rule-based explanation is shown and labelled as such",
+    file: "backend/app/services/explainability.py",
+  },
+];
+---
+
+<details class="method" open={open}>
+  <summary>
+    <span class="method-icon" aria-hidden="true">i</span>
+    How scores are calculated
+  </summary>
+
+  <div class="method-body">
+    <section>
+      <h4>Warning score (0–100)</h4>
+      <p class="method-formula">
+        Final = 0.75 × Model score + 0.25 × Cash-flow score
+      </p>
+      <p>
+        <strong>Model score:</strong> the warning-score model predicts this customer's
+        probability of default. That probability is divided by the Home Credit baseline (8.07%)
+        to give a multiple (lift), and the lift is placed on the same bands
+        <code>core/rules/rules.md</code> uses. If the customer has less than 3 months of cash flow,
+        the final score is the model score alone. If the model files are missing (for example on
+        the Docker image), the score falls back to the rule average
+        0.30 × Delay + 0.20 × Miss + 0.25 × Exposure + 0.25 × Cash flow.
+      </p>
+      <table class="method-table">
+        <thead><tr><th>Band</th><th>Score</th><th>Predicted risk</th><th>Share of test customers</th><th>Actual default rate</th></tr></thead>
+        <tbody>
+          {bands.map((b) => (
+            <tr>
+              <td><span class={`badge ${b.cls}`}>{b.name}</span></td>
+              <td>{b.range}</td><td>{b.lift}</td><td>{b.share}</td><td>{b.observed}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p class="method-note">
+        The bands are checked on 46,127 Home Credit customers the model never saw. The higher the
+        band, the higher the share who actually defaulted. The baseline is 8.07%.
+      </p>
+    </section>
+
+    <section>
+      <h4>Rule scores <small>shown to explain the signals, not added to the final score</small></h4>
+      <p>
+        The model reads the underlying repayment, exposure and income data directly. The four
+        rules turn the same data into readable 0–100 scores and warning messages, using thresholds
+        calibrated on Home Credit.
+      </p>
+    </section>
+
+    <div class="method-grid">
+      <section>
+        <h4>Delay <small>Rule 1 · higher = worse</small></h4>
+        <ul>
+          <li>Late-payment ratio: up to 30 pts</li>
+          <li>Max days past due: up to 20 pts</li>
+          <li>Consecutive late payments: up to 15 pts</li>
+          <li>Average days late, DPD trend, partial payments: up to 10 pts each</li>
+          <li>12-month context: up to 5 pts</li>
+        </ul>
+      </section>
+
+      <section>
+        <h4>Miss <small>Rule 2 · higher = worse</small></h4>
+        <ul>
+          <li>Recovery rate: up to 30 pts</li>
+          <li>Longest late streak: up to 25 pts</li>
+          <li>Miss frequency: up to 15 pts</li>
+          <li>Recency and clustering: up to 10 pts each</li>
+          <li>Holiday or month-end delays: up to −10 pts</li>
+        </ul>
+        <p>Temporary below 25 · Inconclusive 25–50 · Sustained above 50.</p>
+      </section>
+
+      <section>
+        <h4>Exposure <small>Rule 3 · higher = worse</small></h4>
+        <ul>
+          <li>Utilisation (outstanding ÷ sanctioned): up to 25 pts</li>
+          <li>Card or overdraft utilisation: up to 20 pts</li>
+          <li>Active loans, debt-to-income: up to 15 pts each</li>
+          <li>New loans in 3 months, balance trend: up to 10 pts each</li>
+        </ul>
+      </section>
+
+      <section>
+        <h4>Data quality <small>Rule 4 · gate</small></h4>
+        <ul>
+          <li>Repayment records: up to 35 pts</li>
+          <li>Loan and credit-limit data: up to 20 pts</li>
+          <li>Months of history: up to 15 pts</li>
+          <li>Income and DPD fields, freshness, coverage: up to 10 pts each</li>
+        </ul>
+        <p>Complete ≥ 75 · Adequate 50–74 · Partial 25–49 · Insufficient &lt; 25.</p>
+      </section>
+    </div>
+
+    <section class="method-callout">
+      <h4>Insufficient data</h4>
+      <p>
+        A customer is rated only when data quality is at least 50 <em>and</em> at least 6 months
+        of instalments are on file. Below that, the customer is tagged
+        <span class="badge badge-insufficient">Insufficient data</span> and the score is blurred,
+        because a model trained on full histories cannot judge one or two payments. The risk is
+        unknown, not good or bad. The provisional score is still stored for audit.
+      </p>
+    </section>
+
+    <section>
+      <h4>Models</h4>
+      <div class="method-models">
+        {models.map((m) => (
+          <div class="method-model">
+            <div class="method-model-head">
+              <strong>{m.name}</strong>
+              <span class="badge badge-low">{m.status}</span>
+            </div>
+            <p>{m.role}</p>
+            <dl>
+              <dt>Algorithm</dt><dd>{m.algorithm}</dd>
+              <dt>Data</dt><dd>{m.data}</dd>
+              {m.features && <><dt>Features</dt><dd>{m.features}</dd></>}
+              <dt>Quality</dt><dd>{m.quality}</dd>
+              <dt>File</dt><dd><code>{m.file}</code></dd>
+            </dl>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section>
+      <h4>Where results are stored</h4>
+      <p>
+        Uploads and assessments are stored in a <strong>SQLite</strong> database
+        (<code>backend/data/credx.db</code>, via SQLAlchemy). Each run adds a row to
+        <code>warning_assessments</code>, so past scores are kept. Analyst decisions go to
+        <code>alert_classifications</code>, together with the evidence at decision time.
+      </p>
+    </section>
+  </div>
+</details>
