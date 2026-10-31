@@ -1,0 +1,129 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+---
+
+<Layout title="CredX — EWS Dashboard">
+  <div class="dash-layout">
+    <DashboardNav active="dashboard" />
+    <main class="dash-main">
+      <div class="dash-header">
+        <h1>Early Warning <span>Dashboard</span></h1>
+        <div class="dash-actions">
+          <a href="/upload" class="btn btn-secondary">⬆ Upload Data</a>
+          <button id="assessBtn" class="btn btn-primary">▶ Run Assessment</button>
+        </div>
+      </div>
+
+      <div id="content">
+        <div class="loading">Loading portfolio data…</div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  const API = '/api/v1/ews';
+
+  async function loadDashboard() {
+    const container = document.getElementById('content');
+    try {
+      const res = await fetch(`${API}/portfolio`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderDashboard(data, container);
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠</div>Could not load data. Is the backend running?<br><small>${err.message}</small></div>`;
+    }
+  }
+
+  function renderDashboard(data, container) {
+    const dist = data.risk_distribution || {};
+    const total = (dist.Low || 0) + (dist.Medium || 0) + (dist.High || 0) + (dist.Critical || 0);
+
+    const pctLow = total ? ((dist.Low || 0) / total * 100) : 0;
+    const pctMed = total ? ((dist.Medium || 0) / total * 100) : 0;
+    const pctHigh = total ? ((dist.High || 0) / total * 100) : 0;
+    const pctCrit = total ? ((dist.Critical || 0) / total * 100) : 0;
+
+    const topRows = (data.top_risky_customers || []).map(c => {
+      const badgeCls = `badge-${c.risk_category.toLowerCase()}`;
+      const indicators = (c.top_indicators || []).slice(0, 2).join('; ');
+      return `<tr class="clickable" onclick="window.location='/customer/${c.customer_id}'">
+        <td class="mono">${c.customer_id}</td>
+        <td class="score-cell">${c.warning_score.toFixed(1)}</td>
+        <td><span class="badge ${badgeCls}">${c.risk_category}</span></td>
+        <td>${indicators || '—'}</td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-card-label">Total Customers</div>
+          <div class="stat-card-value">${data.total_customers}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Assessed</div>
+          <div class="stat-card-value gold">${data.total_assessed}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Avg Warning Score</div>
+          <div class="stat-card-value">${data.average_warning_score.toFixed(1)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">High + Critical</div>
+          <div class="stat-card-value" style="color: #F97316">${(dist.High || 0) + (dist.Critical || 0)}</div>
+        </div>
+      </div>
+
+      <div class="risk-bar-container">
+        <h3>Risk Distribution</h3>
+        ${total > 0 ? `
+        <div class="risk-bar">
+          ${pctLow > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctLow}%;background:#22C55E">${dist.Low}</div>` : ''}
+          ${pctMed > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctMed}%;background:#F59E0B">${dist.Medium}</div>` : ''}
+          ${pctHigh > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctHigh}%;background:#F97316">${dist.High}</div>` : ''}
+          ${pctCrit > 0 ? `<div class="risk-bar-segment" style="flex-basis:${pctCrit}%;background:#EF4444">${dist.Critical}</div>` : ''}
+        </div>
+        ` : '<div style="color:var(--text-muted);font-size:0.8125rem;">No assessments yet. Upload data and run assessment.</div>'}
+        <div class="risk-bar-legend">
+          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#22C55E"></span> Low (${dist.Low || 0})</div>
+          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F59E0B"></span> Medium (${dist.Medium || 0})</div>
+          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#F97316"></span> High (${dist.High || 0})</div>
+          <div class="risk-bar-legend-item"><span class="risk-bar-legend-dot" style="background:#EF4444"></span> Critical (${dist.Critical || 0})</div>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <h3>Top Risky Customers</h3>
+        ${topRows ? `
+        <table class="data-table">
+          <thead><tr><th>Customer</th><th>Score</th><th>Risk</th><th>Key Indicators</th></tr></thead>
+          <tbody>${topRows}</tbody>
+        </table>` : '<div class="empty-state">No assessed customers yet</div>'}
+      </div>
+    `;
+  }
+
+  document.getElementById('assessBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('assessBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Assessing…';
+    try {
+      const res = await fetch(`${API}/assess`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      btn.textContent = `✓ ${data.total_assessed} assessed`;
+      setTimeout(() => loadDashboard(), 500);
+    } catch (err) {
+      btn.textContent = '✗ Failed';
+    }
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '▶ Run Assessment';
+    }, 2500);
+  });
+
+  loadDashboard();
+</script>
