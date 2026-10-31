@@ -1,0 +1,115 @@
+======================================================================
+HOME CREDIT DATASET - STATISTICAL ANALYSIS FOR EWS RULE THRESHOLDS
+======================================================================
+
+[1/6] Loading datasets...
+  application_train: 307,511 rows
+  installments_payments: 13,605,401 rows
+  bureau: 1,716,428 rows
+  credit_card_balance: 3,840,312 rows
+  POS_CASH_balance loaded (IDs only)
+
+  Overall default rate: 0.0807 (24,825 / 307,511)
+
+======================================================================
+[2/6] RULE 1: REPAYMENT DELAYS ANALYSIS
+======================================================================
+  Computing days late...
+  Aggregating per customer (vectorized)...
+
+--- Days Late Distribution (when late > 0) ---
+  Late payments: 1,146,669 / 13,605,401 (8.43%)
+  P25: 2 days
+  P50: 4 days
+  P75: 9 days
+  P90: 20 days
+  P95: 27 days
+  P99: 107 days
+
+--- Late Ratio per Customer ---
+  P25: 0.0000
+  P50: 0.0179
+  P75: 0.1094
+  P90: 0.2340
+  P95: 0.3214
+  P99: 0.5000
+
+--- Default Rate by Late Ratio ---
+  0-5%: n=205,897, default=0.0683
+  5-10%: n=41,796, default=0.0887
+  10-20%: n=46,842, default=0.0976
+  20-30%: n=24,619, default=0.1083
+  30-50%: n=16,960, default=0.1281
+  50-100%: n=3,473, default=0.1582
+
+--- Default Rate by Max DPD ---
+  0: n=18,437, default=0.0817
+  1-15: n=105,074, default=0.0939
+  16-30: n=34,918, default=0.0930
+  31-60: n=11,618, default=0.1084
+  61-90: n=1,777, default=0.1439
+  91-180: n=2,391, default=0.1168
+  180+: n=5,630, default=0.0877
+
+--- Default Rate by Avg Days Late ---
+  0-5d: n=101,408, default=0.0892
+  5-10d: n=38,706, default=0.1034
+  10-15d: n=17,081, default=0.0992
+  15-30d: n=15,701, default=0.0993
+  30-60d: n=2,639, default=0.1141
+  60d+: n=4,310, default=0.0727
+
+======================================================================
+[3/6] RULE 2: TEMPORARY vs SUSTAINED ANALYSIS (sampled 30k)
+======================================================================
+  Computing consecutive streaks...
+  Done.
+
+--- Default Rate by Max Consecutive Late Streak ---
+  Streak 0: n=12,051, default=0.0670
+  Streak 1: n=7,194, default=0.0934
+  Streak 2: n=3,899, default=0.1023
+  Streak 3: n=1,276, default=0.1058
+  Streak 4-5: n=834, default=0.1043
+  Streak 6-10: n=415, default=0.1012
+  Streak 10+: n=89, default=0.0674
+
+--- Default Rate by Recovery Rate ---
+  Recovery 0-20%: n=127, default=0.0945
+  Recovery 20-40%: n=479, default=0.1273
+  Recovery 40-60%: n=1,366, default=0.1047
+  Recovery 60-80%: n=3,036, default=0.0988
+  Recovery 80-100%: n=20,693, default=0.0784
+
+======================================================================
+[4/6] RULE 3: INCREASING EXPOSURE ANALYSIS
+======================================================================
+
+--- Active Loan Count Percentiles ---
+  P25: 1
+  P50: 2
+  P75: 3
+  P90: 4
+  P95: 5
+  P99: 8
+
+--- Default Rate by Active Loans ---
+Traceback (most recent call last):
+  File "/Users/adhivp/CredX/core/data/analyse_thresholds.py", line 177, in <module>
+    bureau_agg["l_bucket"] = pd.cut(bureau_agg["active_loans"], bins=l_bins, labels=l_labels, right=True)
+                             ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/adhivp/CredX/.venv/lib/python3.14/site-packages/pandas/core/reshape/tile.py", line 288, in cut
+    fac, bins = _bins_to_cuts(
+                ~~~~~~~~~~~~~^
+        x_idx,
+        ^^^^^^
+    ...<6 lines>...
+        ordered=ordered,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/adhivp/CredX/.venv/lib/python3.14/site-packages/pandas/core/reshape/tile.py", line 552, in _bins_to_cuts
+    raise ValueError(
+        "Bin labels must be one fewer than the number of bin edges"
+    )
+ValueError: Bin labels must be one fewer than the number of bin edges
