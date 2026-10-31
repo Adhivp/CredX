@@ -62,7 +62,8 @@ umask 077; python -m app.db.bootstrap && python -m alembic upgrade head && exec 
 ```
 
 `app.db.bootstrap` never deletes data. If `DATABASE_URL` points at a missing or empty
-file, it copies the seed there (login sessions are revoked; user accounts are kept).
+file, it copies the seed there with user accounts and login sessions removed (the seed
+is in a public repository; register a new account after each fresh deployment).
 If the database was built by `create_all` and has no `alembic_version` table, it
 stamps revision `0001` so the upgrade does not fail on existing tables. Override the
 seed location with `DB_SEED_PATH`.

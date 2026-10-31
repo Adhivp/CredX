@@ -4,8 +4,10 @@ Run as `python -m app.db.bootstrap` (the container CMD does this). Never deletes
 
 1. Seed: if the database file is missing or empty and a seed file exists, copy it.
    The image ships the tracked backend/data/credx.db at /app/seed/credx.db, so a
-   fresh container starts from the repository's data instead of an empty database.
-   Copied login sessions are revoked; user accounts are kept.
+   fresh container starts from the repository's EWS data instead of an empty database.
+   User accounts and login sessions are NOT carried over: the seed lives in a public
+   repository, so a deployment must never start with known credentials. Register a
+   new account on each deployment.
 2. Stamp: databases built by Base.metadata.create_all already have the tables from
    migration 0001 but no alembic_version row. Stamp them at 0001 so the upgrade
    does not fail with "table users already exists".
@@ -47,8 +49,10 @@ def seed(path: Path, seed_path: Path) -> bool:
     tmp = path.with_suffix(".seeding")
     shutil.copyfile(seed_path, tmp)
     with sqlite3.connect(tmp) as conn:
-        if "auth_sessions" in {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}:
-            conn.execute("DELETE FROM auth_sessions")
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        for table in ("auth_sessions", "users"):  # sessions first: they reference users
+            if table in tables:
+                conn.execute(f"DELETE FROM {table}")
     tmp.replace(path)
     return True
 
