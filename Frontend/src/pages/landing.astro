@@ -1,18 +1,22 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import AmbientMesh from '../components/common/AmbientMesh.astro';
-import HeaderNav from '../components/landing/HeaderNav.astro';
-import HeroBalance from '../components/landing/HeroBalance.astro';
-import CardShowcase from '../components/landing/CardShowcase.astro';
-import QuickActions from '../components/landing/QuickActions.astro';
-import TransactionLedger from '../components/landing/TransactionLedger.astro';
-import FinancialInsights from '../components/landing/FinancialInsights.astro';
-import LandingFooter from '../components/landing/LandingFooter.astro';
+import Layout from "../layouts/Layout.astro";
+import AmbientMesh from "../components/common/AmbientMesh.astro";
+import HeaderNav from "../components/landing/HeaderNav.astro";
+import HeroBalance from "../components/landing/HeroBalance.astro";
+import CardShowcase from "../components/landing/CardShowcase.astro";
+import QuickActions from "../components/landing/QuickActions.astro";
+import TransactionLedger from "../components/landing/TransactionLedger.astro";
+import FinancialInsights from "../components/landing/FinancialInsights.astro";
+import LandingFooter from "../components/landing/LandingFooter.astro";
 ---
 
-<Layout title="CredX — Private Wealth Client Portal" description="CredX institutional and private banking client dashboard and account overview.">
+<Layout
+	title="CredX — Private Wealth Client Portal"
+	description="CredX institutional and private banking client dashboard and account overview."
+>
 	<div class="landing-page" id="landing-portal">
-		<!-- Ambient Gold Glow Background -->
+		<!-- Landing Background Image & Ambient Glow -->
+		<div class="landing-bg-artwork" aria-hidden="true"></div>
 		<AmbientMesh />
 
 		<!-- Luxury Sticky Navbar -->
@@ -21,7 +25,10 @@ import LandingFooter from '../components/landing/LandingFooter.astro';
 		<!-- Main Dashboard Content -->
 		<main class="landing-main" id="overview">
 			<!-- Balance & Metal Card Grid -->
-			<section class="hero-grid" aria-label="Account Summary and Metal Card">
+			<section
+				class="hero-grid"
+				aria-label="Account Summary and Metal Card"
+			>
 				<HeroBalance />
 				<CardShowcase />
 			</section>
