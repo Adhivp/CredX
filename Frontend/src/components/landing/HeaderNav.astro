@@ -1,0 +1,96 @@
+---
+import BrandLogo from '../common/BrandLogo.astro';
+---
+
+<header class="landing-nav" id="landing-navbar">
+	<div class="nav-brand-group">
+		<a href="/landing" class="nav-logo-link">
+			<BrandLogo size="sm" />
+		</a>
+		<div class="nav-live-pill">
+			<span class="nav-live-dot"></span>
+			<span>Secured Session</span>
+		</div>
+	</div>
+
+	<nav class="nav-menu-links">
+		<a href="#overview" class="nav-link active">Overview</a>
+		<a href="#cards" class="nav-link">Cards</a>
+		<a href="#transfers" class="nav-link">Transfers</a>
+		<a href="#vaults" class="nav-link">Wealth Vaults</a>
+		<a href="#concierge" class="nav-link">Concierge</a>
+	</nav>
+
+	<div class="nav-client-actions">
+		<div class="client-profile-chip" id="user-profile-chip">
+			<div class="client-avatar" id="nav-avatar">AV</div>
+			<div class="client-info">
+				<span class="client-name" id="nav-username">Alexander Vance</span>
+				<span class="client-tier">Private Black Tier</span>
+			</div>
+		</div>
+
+		<button type="button" class="btn-signout" id="btn-signout" aria-label="Sign out of account">
+			<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-linecap="round" stroke-linejoin="round"/>
+				<polyline points="16 17 21 12 16 7" stroke-linecap="round" stroke-linejoin="round"/>
+				<line x1="21" y1="12" x2="9" y2="12" stroke-linecap="round" stroke-linejoin="round"/>
+			</svg>
+			<span>Sign Out</span>
+		</button>
+	</div>
+</header>
+
+<script>
+	import { api } from '../../lib/api';
+
+	document.addEventListener('DOMContentLoaded', async () => {
+		const nameEl = document.getElementById('nav-username');
+		const avatarEl = document.getElementById('nav-avatar');
+		const btnSignout = document.getElementById('btn-signout');
+
+		function renderUser(user: { full_name?: string; email?: string }) {
+			const fullName = user.full_name || 'Client';
+			if (nameEl) nameEl.textContent = fullName;
+			if (avatarEl) {
+				const initials = fullName
+					.split(' ')
+					.filter(Boolean)
+					.map((n: string) => n[0].toUpperCase())
+					.join('')
+					.slice(0, 2) || 'CX';
+				avatarEl.textContent = initials;
+			}
+		}
+
+		// 1. Initial immediate render from cached local user
+		const cachedUser = api.getUser();
+		if (cachedUser) {
+			renderUser(cachedUser);
+		}
+
+		// 2. Verify with backend live session
+		if (api.isAuthenticated()) {
+			try {
+				const freshUser = await api.getMe();
+				renderUser(freshUser);
+			} catch (err) {
+				console.warn('Session verification failed:', err);
+				api.clearStorage();
+				window.location.href = '/';
+			}
+		} else {
+			// If not authenticated, redirect to portal login
+			window.location.href = '/';
+		}
+
+		// 3. Sign Out with backend revocation
+		btnSignout?.addEventListener('click', async () => {
+			if (btnSignout) {
+				btnSignout.setAttribute('style', 'opacity: 0.6; pointer-events: none;');
+			}
+			await api.logout();
+			window.location.href = '/';
+		});
+	});
+</script>
