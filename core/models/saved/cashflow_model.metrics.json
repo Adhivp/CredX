@@ -1,0 +1,69 @@
+{
+  "dataset": "Synthetic 12-month cash flows generated from Home Credit application_train (income, annuity, TARGET)",
+  "customers": 307511,
+  "split_train_test": [
+    246008,
+    61503
+  ],
+  "declining_share": 0.0807,
+  "algorithm": "scikit-learn GradientBoostingClassifier",
+  "params": {
+    "n_estimators": 200,
+    "max_depth": 5,
+    "learning_rate": 0.1,
+    "subsample": 0.8,
+    "min_samples_leaf": 20
+  },
+  "test_auc": 0.8876,
+  "feature_importance": [
+    {
+      "feature": "pct_change_3m",
+      "importance": 0.7832
+    },
+    {
+      "feature": "pct_change_6m",
+      "importance": 0.0703
+    },
+    {
+      "feature": "volatility_6m",
+      "importance": 0.0282
+    },
+    {
+      "feature": "avg_inflow_last6m",
+      "importance": 0.0271
+    },
+    {
+      "feature": "slope_3m",
+      "importance": 0.0255
+    },
+    {
+      "feature": "current_vs_peak",
+      "importance": 0.0159
+    },
+    {
+      "feature": "slope_6m",
+      "importance": 0.0147
+    },
+    {
+      "feature": "min_to_mean_ratio",
+      "importance": 0.0108
+    },
+    {
+      "feature": "avg_inflow_last3m",
+      "importance": 0.0099
+    },
+    {
+      "feature": "volatility_3m",
+      "importance": 0.0077
+    },
+    {
+      "feature": "declining_months_ratio",
+      "importance": 0.0054
+    },
+    {
+      "feature": "inflow_trend_consistency",
+      "importance": 0.0015
+    }
+  ],
+  "trained_at": "2026-10-31 15:52:37"
+}

@@ -30,9 +30,9 @@ const models = [
     status: "In use: 25% of the final score",
     role: "Probability that monthly inflow is in sustained decline. Home Credit has no cash-flow data, so the main model cannot learn this signal and it is added separately.",
     algorithm: "Gradient Boosting Classifier (scikit-learn): 200 trees, depth 5, learning rate 0.1",
-    data: "Synthetic 12-month cash-flow series generated for 200,000 Home Credit applicants, labelled by actual default. Not yet validated on real bank data",
+    data: "Synthetic 12-month cash-flow series generated for all 307,511 Home Credit applicants (3.69M monthly records) from their income, instalment and default label. Split 80 / 20 train / test. Not yet validated on real bank data",
     features: "12 trend features: 3- and 6-month slope, volatility, % change, min/mean ratio, share of declining months, current vs peak, recent average inflow, consistency",
-    quality: "AUC 0.88 on held-out synthetic data. Needs at least 3 months of cash flow",
+    quality: "Test AUC 0.888 on 61,503 held-out synthetic series. Needs at least 3 months of cash flow",
     file: "core/models/saved/cashflow_model.joblib",
   },
   {
