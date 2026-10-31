@@ -1,0 +1,389 @@
+/* Chart marks: thin, quiet chrome; the data is the only loud thing. */
+
+.fill-risk-low { fill: var(--risk-low); stroke: var(--risk-low); background: var(--risk-low); }
+.fill-risk-medium { fill: var(--risk-medium); stroke: var(--risk-medium); background: var(--risk-medium); }
+.fill-risk-high { fill: var(--risk-high); stroke: var(--risk-high); background: var(--risk-high); }
+.fill-risk-critical { fill: var(--risk-critical); stroke: var(--risk-critical); background: var(--risk-critical); }
+.fill-risk-insufficient { fill: var(--risk-insufficient); stroke: var(--risk-insufficient); background: var(--risk-insufficient); }
+.fill-accent { fill: var(--accent); stroke: var(--accent); background: var(--accent); }
+.fill-accent-soft { fill: #a9bdf0; stroke: #a9bdf0; background: #a9bdf0; }
+.fill-neutral { fill: #c9c6be; stroke: #c9c6be; background: #c9c6be; }
+
+/* Donut */
+.donut {
+	position: relative;
+	flex: none;
+}
+
+.donut .arc-track {
+	stroke: var(--stone-2);
+}
+
+.panel--ink .donut .arc-track,
+.band .donut .arc-track {
+	stroke: var(--ink-3);
+}
+
+.donut .arc {
+	stroke-linecap: butt;
+	fill: none !important;
+	cursor: pointer;
+	transition: stroke-width var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.donut .arc:hover,
+.donut .arc:focus-visible {
+	stroke-width: 24px;
+	outline: none;
+}
+
+.donut__center {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-content: center;
+	text-align: center;
+	pointer-events: none;
+}
+
+/* Horizontal bars */
+.hbars {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hbars__row {
+	display: grid;
+	grid-template-columns: minmax(96px, 30%) 1fr 64px;
+	align-items: center;
+	gap: var(--s-3);
+	font-size: var(--fs-sm);
+}
+
+.hbars__row.is-muted {
+	color: var(--text-3);
+}
+
+.hbars__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+	text-decoration: none;
+}
+
+a.hbars__label:hover {
+	text-decoration: underline;
+	color: var(--accent);
+}
+
+.hbars__track {
+	position: relative;
+	height: 20px;
+	display: flex;
+	align-items: center;
+	cursor: default;
+}
+
+.hbars__track::before {
+	content: '';
+	position: absolute;
+	inset: 9px 0;
+	background: var(--line);
+	border-radius: 1px;
+}
+
+.hbars__bar {
+	position: relative;
+	height: 14px;
+	border-radius: 0 4px 4px 0;
+	min-width: 2px;
+	transition: width var(--dur-3) var(--ease);
+}
+
+.hbars__ref {
+	position: absolute;
+	top: -2px;
+	bottom: -2px;
+	width: 2px;
+	margin-left: -1px;
+	background: var(--ink);
+	border-radius: 1px;
+}
+
+.hbars__value {
+	text-align: right;
+	color: var(--text-2);
+	font-weight: 500;
+}
+
+.hbars__note {
+	grid-column: 2 / -1;
+	font-size: var(--fs-xs);
+	color: var(--text-3);
+	margin-top: -6px;
+}
+
+.hbars__legend {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: var(--fs-xs);
+	color: var(--text-3);
+	margin-top: var(--s-2);
+}
+
+.ref-key {
+	width: 2px;
+	height: 12px;
+	background: var(--ink);
+	border-radius: 1px;
+}
+
+/* Stacked bars */
+.stacked {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.stacked__row {
+	display: grid;
+	grid-template-columns: minmax(96px, 30%) 1fr 56px;
+	align-items: center;
+	gap: var(--s-3);
+	font-size: var(--fs-sm);
+}
+
+.stacked__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+	text-decoration: none;
+}
+
+a.stacked__label:hover {
+	color: var(--accent);
+	text-decoration: underline;
+}
+
+.stacked__bar {
+	display: flex;
+	gap: 2px; /* surface gap between segments */
+	height: 16px;
+}
+
+.stacked__part {
+	min-width: 3px;
+	cursor: default;
+}
+
+.stacked__part:first-child { border-radius: 4px 0 0 4px; }
+.stacked__part:last-child { border-radius: 0 4px 4px 0; }
+.stacked__part:only-child { border-radius: 4px; }
+
+.stacked__part:hover,
+.stacked__part:focus-visible {
+	filter: brightness(0.92);
+	outline: none;
+}
+
+.stacked__value {
+	text-align: right;
+	color: var(--text-2);
+}
+
+.stacked__row.is-muted {
+	color: var(--text-3);
+}
+
+.stacked__muted {
+	font-size: var(--fs-xs);
+	color: var(--text-3);
+}
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--s-2) var(--s-4);
+	list-style: none;
+	margin: 0 0 var(--s-2);
+	padding: 0;
+	font-size: var(--fs-xs);
+	color: var(--text-2);
+}
+
+.legend li {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	flex: none;
+}
+
+/* Line & column charts */
+.chart {
+	width: 100%;
+	min-height: 120px;
+}
+
+.linechart,
+.colchart {
+	overflow: visible;
+}
+
+.linechart .grid,
+.colchart .grid {
+	stroke: #e3e1da;
+	stroke-width: 1;
+}
+
+.colchart .baseline {
+	stroke: #c6c3ba;
+	stroke-width: 1;
+}
+
+.tick {
+	font-size: 11px;
+	fill: var(--text-3);
+}
+
+.linechart .line {
+	fill: none;
+	stroke: var(--accent);
+	stroke-width: 2;
+	stroke-linejoin: round;
+	stroke-linecap: round;
+}
+
+.linechart .area {
+	fill: var(--accent);
+	opacity: 0.08;
+}
+
+.linechart .marker {
+	fill: var(--accent);
+	stroke: var(--paper);
+	stroke-width: 2;
+}
+
+.linechart .pt {
+	cursor: pointer;
+	outline: none;
+}
+
+.linechart .pt .hit,
+.colchart .col .hit {
+	fill: transparent;
+}
+
+.linechart .pt:hover .marker,
+.linechart .pt:focus-visible .marker {
+	r: 6;
+}
+
+.linechart .pt:focus-visible .hit {
+	fill: var(--accent-wash);
+}
+
+.linechart .ref {
+	stroke: var(--ink);
+	stroke-width: 1;
+	opacity: 0.5;
+}
+
+.ref-label {
+	font-size: 11px;
+	fill: var(--text-2);
+}
+
+.colchart .col {
+	cursor: pointer;
+	outline: none;
+}
+
+.colchart .col:hover .hit,
+.colchart .col:focus-visible .hit {
+	fill: rgba(0, 0, 0, 0.04);
+}
+
+.colchart .zero-mark {
+	stroke-width: 2;
+	stroke-linecap: round;
+}
+
+/* On the black band */
+.linechart.is-dark .grid {
+	stroke: #26262a;
+}
+
+.linechart.is-dark .tick {
+	fill: #8f8d86;
+}
+
+.linechart.is-dark .line {
+	stroke: var(--accent-on-ink);
+}
+
+.linechart.is-dark .area {
+	fill: var(--accent-on-ink);
+	opacity: 0.12;
+}
+
+.linechart.is-dark .marker {
+	fill: var(--accent-on-ink);
+	stroke: var(--ink);
+}
+
+.linechart.is-dark .pt:focus-visible .hit {
+	fill: rgba(95, 196, 232, 0.16);
+}
+
+/* Table view under charts */
+.tableview {
+	margin-top: var(--s-3);
+	font-size: var(--fs-xs);
+}
+
+.tableview > summary {
+	cursor: pointer;
+	color: var(--text-3);
+	width: max-content;
+}
+
+.tableview > summary:hover {
+	color: var(--text);
+}
+
+.tableview .table-wrap {
+	margin-top: var(--s-2);
+	max-height: 280px;
+	overflow: auto;
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+}
+
+.band .tableview > summary {
+	color: var(--text-on-ink-2);
+}
+
+.band .tableview .table th {
+	background: var(--ink-2);
+	color: var(--text-on-ink-2);
+	border-bottom-color: var(--line-on-ink);
+}
+
+.band .tableview .table td {
+	border-bottom-color: var(--line-on-ink);
+}
+
+.band .tableview .table-wrap {
+	border-color: var(--line-on-ink);
+}

@@ -1,19 +1,183 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import AmbientMesh from '../components/common/AmbientMesh.astro';
-import BrandShowcase from '../components/auth/BrandShowcase.astro';
-import LoginForm from '../components/auth/LoginForm.astro';
+import AppShell from '../layouts/AppShell.astro';
+import BrandMark from '../components/BrandMark.astro';
 ---
 
-<Layout public title="CredX — Sign In" description="Sign in to CredX credit deterioration intelligence.">
-	<main class="auth-container" id="auth-page">
-		<!-- Ambient Gold Glow & Mesh Background -->
-		<AmbientMesh />
+<AppShell title="Sign in" page="sign-in" bare>
+	<div class="signin">
+		<section class="signin__story" aria-label="About CredX">
+			<div class="signin__brand">
+				<BrandMark size={36} inverse />
+				<span>CredX</span>
+			</div>
+			<div class="signin__statement">
+				<h1>Find deteriorating credit before it becomes a default.</h1>
+				<p>
+					CredX monitors repayment, exposure and cash-flow records for every customer in your scope,
+					ranks early-warning signals, and lets specialists investigate them. Scores come from
+					deterministic, versioned rules. Every consequential decision is made and recorded by a person.
+				</p>
+			</div>
+			<dl class="signin__facts">
+				<div><dt>Scoring</dt><dd>Deterministic rules, versioned policy</dd></div>
+				<div><dt>Investigation</dt><dd>Specialist agents with cited evidence</dd></div>
+				<div><dt>Decisions</dt><dd>Human, reasoned and append-only</dd></div>
+			</dl>
+		</section>
 
-		<!-- Left Showcase Panel -->
-		<BrandShowcase />
+		<section class="signin__panel">
+			<div class="signin__card">
+				<div class="tabs" role="tablist" aria-label="Account">
+					<button type="button" class="tab" role="tab" aria-selected="true" aria-controls="form-signin" id="tab-signin" data-tab="signin">Sign in</button>
+					<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="form-register" id="tab-register" data-tab="register">Request access</button>
+				</div>
 
-		<!-- Right Authentication Card -->
-		<LoginForm />
-	</main>
-</Layout>
+				<p class="callout" id="signin-notice" role="status" hidden></p>
+
+				<form id="form-signin" role="tabpanel" aria-labelledby="tab-signin" novalidate>
+					<h2 class="signin__title">Sign in to your workspace</h2>
+					<div class="field">
+						<label class="field__label" for="email">Work email</label>
+						<input class="input" id="email" name="email" type="email" autocomplete="username" required maxlength="254" />
+					</div>
+					<div class="field">
+						<label class="field__label" for="password">Password</label>
+						<input class="input" id="password" name="password" type="password" autocomplete="current-password" required maxlength="128" />
+					</div>
+					<p class="dialog__error" id="signin-error" role="alert" hidden></p>
+					<button class="btn btn--primary signin__submit" type="submit">Sign in</button>
+				</form>
+
+				<form id="form-register" role="tabpanel" aria-labelledby="tab-register" novalidate hidden>
+					<h2 class="signin__title">Request access</h2>
+					<p class="signin__help">
+						New accounts have no role. A risk administrator assigns your role and data scope before you can see any portfolio data.
+					</p>
+					<div class="field">
+						<label class="field__label" for="r-name">Full name</label>
+						<input class="input" id="r-name" name="full_name" autocomplete="name" required maxlength="100" />
+					</div>
+					<div class="field">
+						<label class="field__label" for="r-email">Work email</label>
+						<input class="input" id="r-email" name="email" type="email" autocomplete="email" required maxlength="254" />
+					</div>
+					<div class="field">
+						<label class="field__label" for="r-password">Password</label>
+						<input class="input" id="r-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128" aria-describedby="r-password-hint" />
+						<span class="field__hint" id="r-password-hint">12 to 128 characters.</span>
+					</div>
+					<p class="dialog__error" id="register-error" role="alert" hidden></p>
+					<button class="btn btn--primary signin__submit" type="submit">Create account</button>
+				</form>
+
+				<p class="signin__api" id="api-status" aria-live="polite">Checking the CredX API…</p>
+			</div>
+		</section>
+	</div>
+</AppShell>
+
+<script>
+	import { navigate } from 'astro:transitions/client';
+	import { ApiError, checkHealth } from '../lib/api/client';
+	import { login, me, register } from '../lib/api/auth';
+	import { hasSession } from '../lib/api/session';
+	import { homeFor } from '../lib/permissions';
+
+	/** Only same-origin paths are accepted as a post-sign-in destination. */
+	function safeNext(): string | null {
+		const next = new URLSearchParams(location.search).get('next');
+		return next && next.startsWith('/') && !next.startsWith('//') ? next : null;
+	}
+
+	function show(el: HTMLElement | null, text: string) {
+		if (!el) return;
+		el.textContent = text;
+		el.hidden = !text;
+	}
+
+	document.addEventListener('astro:page-load', async () => {
+		if (document.body.dataset.page !== 'sign-in') return;
+		const params = new URLSearchParams(location.search);
+		const notice = document.getElementById('signin-notice');
+		if (params.has('expired')) show(notice, 'Your session ended. Sign in again to continue where you were.');
+		else if (params.has('signedout')) show(notice, 'You have signed out.');
+
+		const status = document.getElementById('api-status');
+		void checkHealth().then((ok) => {
+			if (!status) return;
+			status.textContent = ok ? 'CredX API reachable' : 'The CredX API is not reachable. Sign-in will fail until it is running.';
+			status.dataset.ok = String(ok);
+		});
+
+		if (hasSession() && !params.has('expired')) {
+			try {
+				const user = await me();
+				void navigate(safeNext() ?? homeFor(user.role));
+				return;
+			} catch {
+				// Stale session: stay on the sign-in form.
+			}
+		}
+
+		const tabs = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
+		const forms = { signin: document.getElementById('form-signin'), register: document.getElementById('form-register') };
+		tabs.forEach((tab) =>
+			tab.addEventListener('click', () => {
+				tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+				const which = tab.dataset.tab as 'signin' | 'register';
+				forms.signin!.hidden = which !== 'signin';
+				forms.register!.hidden = which !== 'register';
+				(forms[which]?.querySelector('input') as HTMLInputElement | null)?.focus();
+			}),
+		);
+
+		const signinForm = forms.signin as HTMLFormElement;
+		signinForm.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const error = document.getElementById('signin-error');
+			show(error, '');
+			if (!signinForm.reportValidity()) return;
+			const data = new FormData(signinForm);
+			const button = signinForm.querySelector('button[type=submit]') as HTMLButtonElement;
+			button.disabled = true;
+			button.classList.add('is-busy');
+			try {
+				const user = await login(String(data.get('email')), String(data.get('password')));
+				void navigate(safeNext() ?? homeFor(user.role));
+			} catch (err) {
+				const message =
+					err instanceof ApiError && err.status === 401
+						? 'Email or password is incorrect, or the account is temporarily locked after repeated failed attempts.'
+						: err instanceof Error
+							? err.message
+							: 'Sign-in failed.';
+				show(error, message);
+				button.disabled = false;
+				button.classList.remove('is-busy');
+			}
+		});
+
+		const registerForm = forms.register as HTMLFormElement;
+		registerForm.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const error = document.getElementById('register-error');
+			show(error, '');
+			if (!registerForm.reportValidity()) return;
+			const data = new FormData(registerForm);
+			const button = registerForm.querySelector('button[type=submit]') as HTMLButtonElement;
+			button.disabled = true;
+			button.classList.add('is-busy');
+			try {
+				await register(String(data.get('email')), String(data.get('full_name')), String(data.get('password')));
+				registerForm.reset();
+				(document.querySelector('[data-tab="signin"]') as HTMLButtonElement).click();
+				show(notice, 'Account created. Sign in now; a risk administrator must assign your role before portfolio data is visible.');
+			} catch (err) {
+				show(error, err instanceof ApiError && err.status === 409 ? 'An account cannot be created with these details.' : err instanceof Error ? err.message : 'Registration failed.');
+			} finally {
+				button.disabled = false;
+				button.classList.remove('is-busy');
+			}
+		});
+	});
+</script>

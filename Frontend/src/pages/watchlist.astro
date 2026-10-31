@@ -1,515 +1,295 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import DashboardNav from "../components/dashboard/DashboardNav.astro";
-import OfficerProfileHeader from "../components/dashboard/OfficerProfileHeader.astro";
+import AppShell from '../layouts/AppShell.astro';
 ---
 
-<Layout title="CredX — Institutional Risk Watchlist">
-  <div class="dash-layout">
-    <DashboardNav active="watchlist" />
-    <main class="dash-main">
-      <!-- Header Row with Top-Right Logout -->
-      <div class="dash-header">
-        <div class="header-titles">
-          <div class="header-badge-row">
-            <span class="header-date" id="watchlist-clock"></span>
-          </div>
-          <h1 class="dash-title">Risk Surveillance <span class="gold-gradient-text">Watchlist</span></h1>
-          <p class="dash-subtitle">
-            Continuous behavioral delinquency surveillance, early default signals, and supervisory audit triage.
-          </p>
-        </div>
-        <div class="dash-actions">
-          <OfficerProfileHeader />
-        </div>
-      </div>
+<AppShell title="Watchlist" page="watchlist">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Customer watchlist</h1>
+			<p class="page-head__lede" id="wl-lede">Customers with a warning assessment, highest warning score first.</p>
+		</div>
+		<form class="wl-find" id="wl-find" role="search">
+			<label class="sr-only" for="wl-find-id">Open a customer by exact ID</label>
+			<input class="input" id="wl-find-id" name="id" placeholder="Open customer by exact ID" autocomplete="off" spellcheck="false" maxlength="64" required />
+			<button class="btn btn--secondary" type="submit">Open</button>
+		</form>
+	</header>
 
-      <!-- Quick KPI Metrics Cards -->
-      <div class="watchlist-stats-row">
-        <div class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Monitored Debtors</span>
-            <div class="stat-icon-bubble gold">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
-          </div>
-          <div class="stat-card-val-row">
-            <span class="stat-main-number gold-glow" id="stat-total-debtors">10</span>
-            <span class="stat-score-scale">Accounts</span>
-          </div>
-          <span class="stat-trend-tag gold">Under Active Surveillance</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Elevated Risk Accounts</span>
-            <div class="stat-icon-bubble coral">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-          </div>
-          <div class="stat-card-val-row">
-            <span class="stat-main-number coral-glow" id="stat-high-debtors">5</span>
-            <span class="stat-score-scale">High / Critical</span>
-          </div>
-          <span class="stat-trend-tag alert-danger">
-            <span class="pulse-dot-coral"></span> Triage Action Required
-          </span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Aggregate Exposure</span>
-            <div class="stat-icon-bubble amber">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-              </svg>
-            </div>
-          </div>
-          <div class="stat-card-val-row">
-            <span class="stat-main-number" id="stat-total-exposure">₹1.47 Cr</span>
-          </div>
-          <span class="stat-trend-tag positive">Monitored Facilities</span>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-card-label">Avg Delinquency Score</span>
-            <div class="stat-icon-bubble emerald">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </div>
-          </div>
-          <div class="stat-card-val-row">
-            <span class="stat-main-number" id="stat-avg-score">42.9</span>
-            <span class="stat-score-scale">/ 100</span>
-          </div>
-          <span class="stat-trend-tag positive">Portfolio Mean Velocity</span>
-        </div>
-      </div>
-
-      <!-- Luxury Filter Console -->
-      <div class="watchlist-filter-panel">
-        <div class="filter-top-row">
-          <div class="filter-pills-bar" id="categoryPills">
-            <button type="button" class="filter-category-pill active" data-category="">
-              <span>All Tiers</span>
-              <span class="pill-badge" id="count-all">10</span>
-            </button>
-            <button type="button" class="filter-category-pill" data-category="Critical">
-              <span style="color:#F87171;">● Critical</span>
-              <span class="pill-badge" id="count-critical">0</span>
-            </button>
-            <button type="button" class="filter-category-pill" data-category="High">
-              <span style="color:#FB923C;">● High Risk</span>
-              <span class="pill-badge" id="count-high">5</span>
-            </button>
-            <button type="button" class="filter-category-pill" data-category="Medium">
-              <span style="color:#FBBF24;">● Medium Risk</span>
-              <span class="pill-badge" id="count-medium">2</span>
-            </button>
-            <button type="button" class="filter-category-pill" data-category="Low">
-              <span style="color:#34D399;">● Low Risk</span>
-              <span class="pill-badge" id="count-low">3</span>
-            </button>
-          </div>
-          <button type="button" class="btn btn-glass btn-sm" id="resetFiltersBtn" style="padding:0.4rem 0.85rem;font-size:0.75rem;">
-            <span>↺ Reset Filters</span>
-          </button>
-        </div>
-
-        <div class="filter-controls-grid">
-          <!-- Real-Time Search -->
-          <div class="form-group">
-            <label class="form-label" for="searchCustomer">Search Debtor</label>
-            <div style="position:relative;">
-              <input 
-                type="text" 
-                id="searchCustomer" 
-                class="form-input" 
-                placeholder="Search Customer ID (e.g. CUST001)…" 
-                style="width:100%;padding-left:2.4rem;" 
-              />
-              <svg style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--white-40);pointer-events:none;" width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-            </div>
-          </div>
-
-          <!-- Product Selector with Custom Dark Styling -->
-          <div class="form-group">
-            <label class="form-label" for="filterProduct">Credit Facility</label>
-            <select id="filterProduct" class="form-select">
-              <option value="">All Products</option>
-              <option value="personal_loan">Personal Loan</option>
-              <option value="business_loan">Business Loan</option>
-              <option value="home_loan">Home Loan</option>
-            </select>
-          </div>
-
-          <!-- Min Score Slider -->
-          <div class="form-group">
-            <label class="form-label" for="filterScore">
-              <span>Minimum Warning Score</span>
-              <span id="scoreLabel" class="mono" style="color:var(--gold-400);font-weight:700;">≥ 0</span>
-            </label>
-            <div style="display:flex;align-items:center;gap:0.75rem;padding-top:0.25rem;">
-              <input type="range" id="filterScore" class="form-range" min="0" max="100" value="0" />
-            </div>
-          </div>
-
-          <!-- Filter Action Button -->
-          <div>
-            <button id="applyFilter" class="btn btn-gold" style="width:100%;">
-              <span>Apply Filters</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Watchlist Table Container -->
-      <div id="watchlistContent">
-        <div class="loading" style="padding:3.5rem 0;text-align:center;">
-          <div class="pulse-dot" style="margin:0 auto 1rem;width:12px;height:12px;"></div>
-          <span>Loading institutional debtor surveillance records…</span>
-        </div>
-      </div>
-    </main>
-  </div>
-</Layout>
+	<section class="panel panel--flush" aria-labelledby="wl-title">
+		<h2 class="sr-only" id="wl-title">Watchlist</h2>
+		<form class="wl-filters filters" id="wl-filters">
+			<div class="field">
+				<label class="field__label" for="f-risk">Risk category</label>
+				<select class="input" id="f-risk" name="risk_level">
+					<option value="">All categories</option>
+					<option value="Critical">Critical</option>
+					<option value="High">High</option>
+					<option value="Medium">Medium</option>
+					<option value="Low">Low</option>
+					<option value="Insufficient Data">Insufficient data</option>
+				</select>
+			</div>
+			<div class="field" id="f-product-field"></div>
+			<div class="field" id="f-segment-field"></div>
+			<div class="field wl-filters__score">
+				<label class="field__label" for="f-score">Minimum warning score</label>
+				<input class="input" id="f-score" name="min_score" type="number" min="0" max="100" step="5" placeholder="0" inputmode="decimal" />
+			</div>
+			<div class="wl-filters__actions">
+				<button type="submit" class="btn btn--primary btn--sm">Apply</button>
+				<button type="button" class="btn btn--ghost btn--sm" id="wl-reset">Reset</button>
+			</div>
+		</form>
+		<div class="wl-status" id="wl-status" aria-live="polite"></div>
+		<div class="table-wrap wl-table-wrap">
+			<table class="table wl-table">
+				<thead>
+					<tr>
+						<th scope="col" class="wl-sticky">Customer</th>
+						<th scope="col">Product</th>
+						<th scope="col" class="num wl-wrap" title="Outstanding balance of the customer's largest facility"><button type="button" class="th-sort" data-sort="outstanding_exposure">Outstanding, largest facility</button></th>
+						<th scope="col"><button type="button" class="th-sort" data-sort="warning_score" aria-sort="descending">Warning score</button></th>
+						<th scope="col">Risk</th>
+						<th scope="col" title="Component scores above 20 out of repayment delay, missed payments, exposure and cash flow"><button type="button" class="th-sort" data-sort="active_signals">Active signals</button></th>
+						<th scope="col">Primary indicators</th>
+						<th scope="col">Investigation</th>
+						<th scope="col"><span class="sr-only">Action</span></th>
+					</tr>
+				</thead>
+				<tbody id="wl-body"></tbody>
+			</table>
+		</div>
+		<div id="wl-empty"></div>
+		<nav class="pager" id="wl-pager" aria-label="Watchlist pages" hidden></nav>
+	</section>
+</AppShell>
 
 <script>
-  const API = '/api/v1/ews';
-  let allItems = [];
-  let currentRiskFilter = '';
-  let searchQuery = '';
+	import { portfolioSummary, watchlist } from '../lib/api/ews';
+	import { portfolioIntelligence } from '../lib/api/governance';
+	import { isAbort } from '../lib/api/client';
+	import { count, humanize, money } from '../lib/format';
+	import { html, mount } from '../lib/html';
+	import { $, $$, definePage, navigate, setParams, type PageContext } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import type { WatchlistEntry, WatchlistQuery } from '../lib/types';
+	import { emptyState, errorState, riskBadge, scoreBar, statusPill } from '../lib/ui';
 
-  // Update real-time clock
-  function updateClock() {
-    const clockEl = document.getElementById('watchlist-clock');
-    if (clockEl) {
-      clockEl.textContent = new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
-  }
-  updateClock();
+	const PAGE_SIZE = 25;
+	type SortKey = 'warning_score' | 'outstanding_exposure' | 'active_signals';
+	let sort: { key: SortKey; dir: 1 | -1 } = { key: 'warning_score', dir: -1 };
+	let rows: WatchlistEntry[] = [];
 
-  function formatCurrency(amount) {
-    if (!amount) return '₹0';
-    if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
-    }
-    if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
-    }
-    return `₹${Number(amount).toLocaleString('en-IN')}`;
-  }
+	function queryFromUrl(): WatchlistQuery & { page: number } {
+		const p = new URLSearchParams(location.search);
+		const minScore = Number(p.get('min_score'));
+		return {
+			risk_level: p.get('risk_level') ?? undefined,
+			product_type: p.get('product_type') ?? undefined,
+			customer_segment: p.get('customer_segment') ?? undefined,
+			min_score: Number.isFinite(minScore) && minScore > 0 ? Math.min(100, minScore) : undefined,
+			page: Math.max(1, Number(p.get('page')) || 1),
+		};
+	}
 
-  function getRiskBadge(category) {
-    const cat = (category || 'low').toLowerCase();
-    return `<span class="badge badge-${cat}">${category}</span>`;
-  }
+	function choiceField(id: string, name: string, label: string, options: string[] | null, value?: string) {
+		if (options && options.length) {
+			const values = value && !options.includes(value) ? [value, ...options] : options;
+			return html`<label class="field__label" for="${id}">${label}</label><select class="input" id="${id}" name="${name}">
+				<option value="">All</option>${values.map((o) => html`<option value="${o}" ${o === value ? 'selected' : ''}>${humanize(o)}</option>`)}</select>`;
+		}
+		return html`<label class="field__label" for="${id}">${label}</label><input class="input" id="${id}" name="${name}" value="${value ?? ''}" placeholder="Exact value" maxlength="64" />`;
+	}
 
-  function getScoreGradientBar(score) {
-    let grad = 'linear-gradient(90deg, #10B981, #059669)';
-    let color = '#34D399';
-    if (score >= 70) {
-      grad = 'linear-gradient(90deg, #EF4444, #DC2626)';
-      color = '#F87171';
-    } else if (score >= 45) {
-      grad = 'linear-gradient(90deg, #F97316, #EA580C)';
-      color = '#FB923C';
-    } else if (score >= 20) {
-      grad = 'linear-gradient(90deg, #F59E0B, #D97706)';
-      color = '#FBBF24';
-    }
+	function renderRows() {
+		const sorted = [...rows].sort((a, b) => (a[sort.key] - b[sort.key]) * sort.dir);
+		$$<HTMLButtonElement>('.th-sort').forEach((b) =>
+			b.dataset.sort === sort.key ? b.setAttribute('aria-sort', sort.dir === 1 ? 'ascending' : 'descending') : b.removeAttribute('aria-sort'),
+		);
+		mount(
+			$('#wl-body'),
+			html`${sorted.map((r) => {
+				const href = `/customer?id=${encodeURIComponent(r.customer_id)}`;
+				return html`<tr class="is-link" data-href="${href}">
+					<td class="wl-sticky"><a class="row-link" href="${href}">${r.customer_id}</a></td>
+					<td class="nowrap">${r.product_type ? humanize(r.product_type) : html`<span class="muted">No facility</span>`}</td>
+					<td class="num">${r.product_type ? money(r.outstanding_exposure) : html`<span class="muted">—</span>`}</td>
+					<td>${scoreBar(r.warning_score, r.risk_category)}</td>
+					<td>${riskBadge(r.risk_category, 'sm')}</td>
+					<td class="num" data-tip="${r.active_signals} of 4 component scores above 20">${r.active_signals}<span class="muted"> / 4</span></td>
+					<td><span class="indicators">${r.top_indicators.length ? r.top_indicators.map((i) => html`<span title="${i}">${i}</span>`) : html`<span class="muted">None recorded</span>`}</span></td>
+					<td>${statusPill(r.monitoring_status)}</td>
+					<td><a class="btn btn--ghost btn--sm" href="${href}" aria-label="Review ${r.customer_id}">Review</a></td>
+				</tr>`;
+			})}`,
+		);
+	}
 
-    return `
-      <div class="score-display-row">
-        <span class="mono" style="font-weight:800;color:${color};min-width:38px;">${score.toFixed(1)}</span>
-        <div class="score-mini-bar-track">
-          <div style="height:100%;border-radius:var(--radius-full);width:${Math.min(100, Math.max(0, score))}%;background:${grad};"></div>
-        </div>
-      </div>`;
-  }
+	async function refresh(ctx: PageContext) {
+		const q = queryFromUrl();
+		const body = $('#wl-body');
+		const status = $('#wl-status');
+		const empty = $('#wl-empty');
+		const pager = $('#wl-pager');
+		if (body && !body.children.length) {
+			mount(body, html`${Array.from({ length: 6 }, () => html`<tr class="wl-skeleton">${Array.from({ length: 9 }, () => html`<td><span class="skeleton skeleton--line"></span></td>`)}</tr>`)}`);
+		} else body?.classList.add('is-refreshing');
+		mount(empty, '');
+		try {
+			const res = await watchlist({
+				risk_level: q.risk_level,
+				product_type: q.product_type,
+				customer_segment: q.customer_segment,
+				min_score: q.min_score,
+				limit: PAGE_SIZE,
+				offset: (q.page - 1) * PAGE_SIZE,
+			});
+			if (ctx.signal.aborted) return;
+			rows = res.items;
+			const filtered = Boolean(q.risk_level || q.product_type || q.customer_segment || q.min_score);
+			if (!res.total) {
+				mount(body, '');
+				pager!.hidden = true;
+				mount(status, '');
+				mount(
+					empty,
+					filtered
+						? emptyState('No customers match these filters', 'Filters match exact values. Reset them to see the full watchlist.', html`<button type="button" class="btn btn--secondary btn--sm" data-reset>Reset filters</button>`)
+						: emptyState(
+								'No assessed customers yet',
+								can(ctx.user.role, 'run_assessment') ? 'Upload portfolio data and run an assessment to build the watchlist.' : 'Customers appear here after an analyst runs an assessment.',
+								can(ctx.user.role, 'upload_data') ? html`<a class="btn btn--primary btn--sm" href="/data">Go to data and assessment</a>` : undefined,
+							),
+				);
+				$('[data-reset]', empty!)?.addEventListener('click', reset);
+				return;
+			}
+			const pages = Math.max(1, Math.ceil(res.total / PAGE_SIZE));
+			if (q.page > pages) {
+				setParams({ page: pages });
+				return refresh(ctx);
+			}
+			const first = (q.page - 1) * PAGE_SIZE + 1;
+			const last = first + res.items.length - 1;
+			mount(
+				status,
+				html`<span>${count(first)}–${count(last)} of ${count(res.total)} customers${filtered ? ' matching filters' : ''}</span>
+				<span class="muted">${sort.key === 'warning_score' && sort.dir === -1 ? 'Ordered by warning score, highest first' : 'Sorted within this page only; pages follow warning score order'}</span>`,
+			);
+			renderRows();
+			pager!.hidden = pages <= 1;
+			mount(
+				pager,
+				html`<span>Page ${q.page} of ${pages}</span><span class="btn-row">
+					<button type="button" class="btn btn--ghost btn--sm" data-page="${q.page - 1}" ${q.page <= 1 ? 'disabled' : ''}>Previous</button>
+					<button type="button" class="btn btn--ghost btn--sm" data-page="${q.page + 1}" ${q.page >= pages ? 'disabled' : ''}>Next</button></span>`,
+			);
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			mount(body, '');
+			mount(status, '');
+			pager!.hidden = true;
+			mount(empty, errorState(error));
+			$('[data-retry]', empty!)?.addEventListener('click', () => void refresh(ctx), { once: true });
+		} finally {
+			body?.classList.remove('is-refreshing');
+		}
+	}
 
-  function updateKpiStats(items) {
-    if (!items || items.length === 0) return;
+	let current: PageContext | null = null;
+	function reset() {
+		const form = $<HTMLFormElement>('#wl-filters');
+		form?.reset();
+		$$<HTMLInputElement | HTMLSelectElement>('#wl-filters [name]').forEach((el) => (el.value = ''));
+		setParams({ risk_level: null, product_type: null, customer_segment: null, min_score: null, page: null });
+		if (current) void refresh(current);
+	}
 
-    const total = items.length;
-    const highAndCritical = items.filter(i => i.risk_category === 'Critical' || i.risk_category === 'High').length;
-    const criticalCount = items.filter(i => i.risk_category === 'Critical').length;
-    const highCount = items.filter(i => i.risk_category === 'High').length;
-    const medCount = items.filter(i => i.risk_category === 'Medium').length;
-    const lowCount = items.filter(i => i.risk_category === 'Low').length;
+	definePage('watchlist', async (ctx) => {
+		current = ctx;
+		sort = { key: 'warning_score', dir: -1 };
+		const q = queryFromUrl();
+		const form = $<HTMLFormElement>('#wl-filters')!;
+		($('#f-risk') as HTMLSelectElement).value = q.risk_level ?? '';
+		($('#f-score') as HTMLInputElement).value = q.min_score ? String(q.min_score) : '';
 
-    const totalExposure = items.reduce((acc, i) => acc + (i.outstanding_exposure || 0), 0);
-    const avgScore = items.reduce((acc, i) => acc + (i.warning_score || 0), 0) / total;
+		// Filter values come from the portfolio aggregate when the role can see it; otherwise exact text.
+		let products: string[] | null = null;
+		let segments: string[] | null = null;
+		if (can(ctx.user.role, 'view_portfolio')) {
+			try {
+				const intel = await portfolioIntelligence();
+				products = intel.products.map((g) => g.group).filter((g) => g !== 'none');
+				segments = intel.segments.map((g) => g.group).filter((g) => g !== 'unspecified');
+			} catch {
+				// Fall back to free-text filters.
+			}
+		}
+		if (ctx.signal.aborted) return;
+		mount($('#f-product-field'), choiceField('f-product', 'product_type', 'Product', products, q.product_type));
+		mount($('#f-segment-field'), choiceField('f-segment', 'customer_segment', 'Segment', segments, q.customer_segment));
 
-    const totalEl = document.getElementById('stat-total-debtors');
-    const highEl = document.getElementById('stat-high-debtors');
-    const expEl = document.getElementById('stat-total-exposure');
-    const avgEl = document.getElementById('stat-avg-score');
+		void portfolioSummary()
+			.then((s) => {
+				if (ctx.signal.aborted) return;
+				const missing = s.total_customers - s.total_assessed;
+				mount(
+					$('#wl-lede'),
+					`Customers with a warning assessment, highest warning score first.${missing > 0 ? ` ${count(missing)} customer${missing === 1 ? ' has' : 's have'} no assessment yet and ${missing === 1 ? 'is' : 'are'} not listed.` : ''}`,
+				);
+			})
+			.catch(() => {});
 
-    if (totalEl) totalEl.textContent = total.toString();
-    if (highEl) highEl.textContent = highAndCritical.toString();
-    if (expEl) expEl.textContent = formatCurrency(totalExposure);
-    if (avgEl) avgEl.textContent = avgScore.toFixed(1);
+		form.addEventListener('submit', (e) => {
+			e.preventDefault();
+			const data = new FormData(form);
+			const min = Number(data.get('min_score'));
+			setParams({
+				risk_level: String(data.get('risk_level') ?? ''),
+				product_type: String(data.get('product_type') ?? '').trim(),
+				customer_segment: String(data.get('customer_segment') ?? '').trim(),
+				min_score: Number.isFinite(min) && min > 0 ? Math.min(100, min) : null,
+				page: null,
+			});
+			void refresh(ctx);
+		});
+		form.addEventListener('change', (e) => {
+			if ((e.target as HTMLElement).tagName === 'SELECT') form.requestSubmit();
+		});
+		$('#wl-reset')?.addEventListener('click', reset);
 
-    // Update Category Pills Badges
-    const cAll = document.getElementById('count-all');
-    const cCrit = document.getElementById('count-critical');
-    const cHigh = document.getElementById('count-high');
-    const cMed = document.getElementById('count-medium');
-    const cLow = document.getElementById('count-low');
+		$$<HTMLButtonElement>('.th-sort').forEach((b) =>
+			b.addEventListener('click', () => {
+				const key = b.dataset.sort as SortKey;
+				sort = sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: -1 };
+				renderRows();
+				const note = $('#wl-status .muted');
+				if (note) note.textContent = sort.key === 'warning_score' && sort.dir === -1 ? 'Ordered by warning score, highest first' : 'Sorted within this page only; pages follow warning score order';
+			}),
+		);
 
-    if (cAll) cAll.textContent = total.toString();
-    if (cCrit) cCrit.textContent = criticalCount.toString();
-    if (cHigh) cHigh.textContent = highCount.toString();
-    if (cMed) cMed.textContent = medCount.toString();
-    if (cLow) cLow.textContent = lowCount.toString();
-  }
+		$('#wl-pager')?.addEventListener('click', (e) => {
+			const page = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-page]')?.dataset.page;
+			if (!page) return;
+			setParams({ page: Number(page) > 1 ? page : null });
+			void refresh(ctx);
+			$('#wl-title')?.closest('section')?.scrollIntoView({ block: 'start' });
+		});
 
-  async function loadWatchlist() {
-    const container = document.getElementById('watchlistContent');
-    const product = (document.getElementById('filterProduct') as HTMLSelectElement)?.value || '';
-    const minScore = (document.getElementById('filterScore') as HTMLInputElement)?.value || '0';
+		// Whole-row click opens the customer (the ID link remains the keyboard path).
+		$('#wl-body')?.addEventListener('click', (e) => {
+			const target = e.target as HTMLElement;
+			if (target.closest('a, button')) return;
+			const href = target.closest<HTMLElement>('tr[data-href]')?.dataset.href;
+			if (href) void navigate(href);
+		});
 
-    let url = `${API}/watchlist?min_score=${minScore}&limit=100`;
-    if (currentRiskFilter) {
-      url += `&risk_level=${encodeURIComponent(currentRiskFilter)}`;
-    }
-    if (product) {
-      url += `&product_type=${encodeURIComponent(product)}`;
-    }
+		$('#wl-find')?.addEventListener('submit', (e) => {
+			e.preventDefault();
+			const id = String(new FormData(e.target as HTMLFormElement).get('id') ?? '').trim();
+			if (id) void navigate(`/customer?id=${encodeURIComponent(id)}`);
+		});
 
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      allItems = data.items || [];
-
-      // Update KPIs only on unfiltered baseline if not yet set
-      if (!currentRiskFilter && !product && minScore === '0') {
-        updateKpiStats(allItems);
-      }
-
-      applySearchAndRender();
-    } catch (err: any) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">⚠️</div>
-          <h3>Failed to Load Watchlist</h3>
-          <p style="color:var(--white-60);">${err.message}</p>
-        </div>`;
-    }
-  }
-
-  function applySearchAndRender() {
-    const container = document.getElementById('watchlistContent');
-    if (!container) return;
-
-    let filtered = allItems;
-    if (searchQuery.trim().length > 0) {
-      const q = searchQuery.toLowerCase().trim();
-      filtered = allItems.filter(item => 
-        (item.customer_id || '').toLowerCase().includes(q) ||
-        (item.product_type || '').toLowerCase().includes(q) ||
-        (item.risk_category || '').toLowerCase().includes(q)
-      );
-    }
-
-    renderTable(filtered, container);
-  }
-
-  function renderTable(items: any[], container: HTMLElement) {
-    if (!items || items.length === 0) {
-      container.innerHTML = `
-        <div class="dossier-panel" style="padding:3.5rem 2rem;text-align:center;">
-          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📋</div>
-          <h3 style="font-family:var(--font-display);font-size:1.25rem;color:var(--white);margin-bottom:0.35rem;">
-            No Debtors Matching Current Filters
-          </h3>
-          <p style="color:var(--white-50);font-size:0.875rem;max-width:450px;margin:0 auto 1.25rem;">
-            Try adjusting the minimum warning score threshold, clearing product filters, or select "All Tiers".
-          </p>
-          <button type="button" class="btn btn-gold btn-sm" id="clearEmptyFilterBtn">
-            <span>Reset Filters</span>
-          </button>
-        </div>`;
-
-      document.getElementById('clearEmptyFilterBtn')?.addEventListener('click', resetFilters);
-      return;
-    }
-
-    const rows = items.map(item => {
-      const cid = item.customer_id;
-      const initials = cid.replace(/[^0-9A-Z]/gi, '').slice(-2) || 'CX';
-      const prodName = (item.product_type || 'Facility').replace(/_/g, ' ');
-      const outstanding = formatCurrency(item.outstanding_exposure);
-      const indicators = (item.top_indicators || []).slice(0, 2);
-
-      return `
-        <tr class="table-row-clickable" onclick="window.location='/customer/${cid}'">
-          <td>
-            <div class="customer-cell">
-              <div class="customer-avatar">${initials}</div>
-              <div class="customer-id-group">
-                <span class="customer-id-badge">${cid}</span>
-                <span class="customer-subtext" style="text-transform:capitalize;">${prodName}</span>
-              </div>
-            </div>
-          </td>
-          <td>
-            <span class="mono" style="font-weight:700;color:var(--white-90);">${outstanding}</span>
-          </td>
-          <td>
-            ${getScoreGradientBar(item.warning_score)}
-          </td>
-          <td>
-            ${getRiskBadge(item.risk_category)}
-          </td>
-          <td>
-            <div style="display:flex;flex-direction:column;gap:0.3rem;max-width:320px;">
-              ${indicators.length > 0 ? indicators.map(ind => `
-                <div style="font-size:0.75rem;color:var(--white-75);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                  <span style="color:var(--gold-400);margin-right:4px;">⚡</span>${ind}
-                </div>
-              `).join('') : '<span style="font-size:0.75rem;color:var(--white-40);">No active delinquency flags</span>'}
-            </div>
-          </td>
-          <td>
-            <span class="status-indicator-badge live" style="font-size:0.68rem;">
-              <span class="pulse-dot-emerald"></span> ${item.monitoring_status || 'Active'}
-            </span>
-          </td>
-          <td style="text-align:right;">
-            <a href="/customer/${cid}" class="btn btn-glass btn-sm" style="padding:0.4rem 0.85rem;font-size:0.75rem;" onclick="event.stopPropagation()">
-              <span>Inspect →</span>
-            </a>
-          </td>
-        </tr>`;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="dossier-panel" style="padding:1.5rem 1.75rem;">
-        <div class="panel-header-row" style="margin-bottom:1rem;">
-          <div class="panel-title-group">
-            <span class="panel-eyebrow">Surveillance Telemetry</span>
-            <h3 class="panel-title">Active Watchlist Cohort</h3>
-          </div>
-          <span class="panel-count-pill">${items.length} Debtors Displayed</span>
-        </div>
-
-        <div class="table-scroll-frame">
-          <table class="luxury-data-table">
-            <thead>
-              <tr>
-                <th>Customer Debtor</th>
-                <th>Outstanding Exposure</th>
-                <th>Warning Velocity Score</th>
-                <th>Risk Category</th>
-                <th>Key Delinquency Signals</th>
-                <th>Surveillance Status</th>
-                <th style="text-align:right;">Dossier Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-  }
-
-  function resetFilters() {
-    currentRiskFilter = '';
-    searchQuery = '';
-    const searchInput = document.getElementById('searchCustomer') as HTMLInputElement;
-    const productSelect = document.getElementById('filterProduct') as HTMLSelectElement;
-    const scoreSlider = document.getElementById('filterScore') as HTMLInputElement;
-    const scoreLabel = document.getElementById('scoreLabel');
-
-    if (searchInput) searchInput.value = '';
-    if (productSelect) productSelect.value = '';
-    if (scoreSlider) scoreSlider.value = '0';
-    if (scoreLabel) scoreLabel.textContent = '≥ 0';
-
-    document.querySelectorAll('.filter-category-pill').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-category') === '');
-    });
-
-    loadWatchlist();
-  }
-
-  // Event Listeners
-  document.addEventListener('DOMContentLoaded', () => {
-    const scoreSlider = document.getElementById('filterScore') as HTMLInputElement;
-    const scoreLabel = document.getElementById('scoreLabel');
-    const searchInput = document.getElementById('searchCustomer') as HTMLInputElement;
-    const applyBtn = document.getElementById('applyFilter');
-    const resetBtn = document.getElementById('resetFiltersBtn');
-
-    // Slider listener
-    scoreSlider?.addEventListener('input', () => {
-      if (scoreLabel) scoreLabel.textContent = `≥ ${scoreSlider.value}`;
-    });
-
-    // Category pills filter
-    document.querySelectorAll('.filter-category-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.filter-category-pill').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentRiskFilter = btn.getAttribute('data-category') || '';
-        loadWatchlist();
-      });
-    });
-
-    // Search input (instant client-side filtering)
-    searchInput?.addEventListener('input', () => {
-      searchQuery = searchInput.value;
-      applySearchAndRender();
-    });
-
-    // Apply & Reset buttons
-    applyBtn?.addEventListener('click', loadWatchlist);
-    resetBtn?.addEventListener('click', resetFilters);
-
-    // Live system timestamp
-    function updateClock() {
-      const clock = document.getElementById('watchlist-clock');
-      if (clock) {
-        const now = new Date();
-        clock.textContent = now.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        }).toUpperCase();
-      }
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-
-    loadWatchlist();
-  });
+		await refresh(ctx);
+	});
 </script>

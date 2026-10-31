@@ -1,0 +1,531 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Customer" page="customer">
+	<nav class="crumbs" aria-label="Breadcrumb"><a href="/watchlist">Watchlist</a><span aria-hidden="true">/</span><span id="cu-crumb">Customer</span></nav>
+	<div id="cu-root"></div>
+</AppShell>
+
+<script>
+	import { classifyAlert, customer as fetchCustomer, explain, runAssessment } from '../lib/api/ews';
+	import { initiate, list as listInvestigations, workspace } from '../lib/api/investigations';
+	import { ApiError, isAbort } from '../lib/api/client';
+	import { columns, hbars, line, responsive, tableView } from '../lib/charts';
+	import { count, epochDate, epochDateTime, epochShort, humanize, isoDate, money, moneyCompact, pct, relative, score, signed, signedPct } from '../lib/format';
+	import { html, mount, type Html } from '../lib/html';
+	import { CLASSIFICATION, CONTEXT_CATEGORY, OPEN_STATUSES, REPAYMENT_STATUS_TONE, SCORE_COMPONENTS, textOf } from '../lib/labels';
+	import { $, $$, definePage, navigate, type PageContext } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import { ALERT_DECISIONS, CONTEXT_CATEGORIES, type Calculation, type CustomerDetail, type InvestigationSummary, type WarningAssessment, type Workspace } from '../lib/types';
+	import { emptyState, errorState, failureMessage, openDialog, pill, riskBadge, riskClass, skeleton, statusPill, summary, toast } from '../lib/ui';
+
+	const DECISION_HINT: Record<string, string> = {
+		'Continue Monitoring': 'The signal is acknowledged; keep the customer under routine monitoring.',
+		'Requires Investigation': 'The signal needs an evidence investigation. Recording this does not start one.',
+		'False Positive': 'The signal does not reflect real credit deterioration.',
+		'Escalate for Review': 'Refer the signal to a credit manager. This is recorded on the assessment and does not create a review-queue item.',
+	};
+
+	const STATUS_CLASS: Record<string, string> = { good: 'fill-risk-low', warning: 'fill-risk-medium', serious: 'fill-risk-high', critical: 'fill-risk-critical', neutral: 'fill-neutral' };
+
+	interface State {
+		detail: CustomerDetail;
+		investigations: InvestigationSummary[];
+		investigationsCapped: boolean;
+		/** undefined while the latest investigation is loading; null when there is none. */
+		ws: Workspace | null | undefined;
+		period: number;
+		showAllRepayments: boolean;
+	}
+
+	// ── Sections ─────────────────────────────────────────────────────────
+
+	function header(s: State, ctx: PageContext): Html {
+		const { customer: c, assessments } = s.detail;
+		const latest = assessments[0];
+		const active = s.investigations.find((i) => OPEN_STATUSES.has(i.status));
+		const monitoring = s.investigations[0];
+		const actions: Html[] = [];
+		if (can(ctx.user.role, 'run_assessment')) actions.push(html`<button type="button" class="btn btn--secondary" data-act="assess">Assess this customer</button>`);
+		if (latest) actions.push(html`<button type="button" class="btn btn--secondary" data-act="explain">Explain assessment</button>`);
+		if (active) actions.push(html`<a class="btn btn--primary" href="/investigation?id=${encodeURIComponent(active.id)}">Open active investigation</a>`);
+		else if (can(ctx.user.role, 'initiate_investigation')) actions.push(html`<button type="button" class="btn btn--primary" data-act="investigate">Start investigation</button>`);
+		return html`<header class="cu-head">
+			<div class="cu-head__id">
+				<h1 class="page-head__title page-head__title--sm">${c.customer_id}</h1>
+				<dl class="cu-head__facts">
+					<div><dt>Customer type</dt><dd>${humanize(c.customer_type)}</dd></div>
+					<div><dt>Segment</dt><dd>${c.portfolio_segment ? humanize(c.portfolio_segment) : 'Not recorded'}</dd></div>
+					<div><dt>Employment</dt><dd>${c.employment_category ? humanize(c.employment_category) : 'Not recorded'}</dd></div>
+					<div><dt>Monitoring</dt><dd>${monitoring ? statusPill(monitoring.status) : pill('Not investigated', 'neutral')}</dd></div>
+				</dl>
+			</div>
+			<div class="cu-head__score">
+				${latest
+					? html`<div class="cu-figure"><span class="cu-figure__value tnum">${score(latest.warning_score)}</span><span class="cu-figure__unit">/ 100 warning score</span></div>
+						${riskBadge(latest.risk_category)}<p class="note">Assessed ${epochDateTime(latest.assessed_at)} (${relative(latest.assessed_at)})</p>`
+					: html`<p class="secondary">Not assessed yet</p>`}
+			</div>
+			<div class="cu-head__actions btn-row">${actions}</div>
+		</header>`;
+	}
+
+	function riskOverview(s: State): Html {
+		const [latest, previous] = s.detail.assessments;
+		if (!latest) return emptyState('No assessment recorded', 'Run an assessment to score this customer.');
+		const delta = previous ? latest.warning_score - previous.warning_score : null;
+		const values = latest as unknown as Record<string, number>;
+		return html`<div class="panel__head"><h2 class="panel__title">Risk overview</h2><span class="panel__meta">Latest stored assessment</span></div>
+			<div class="cu-overview">
+				<dl class="facts cu-overview__facts">
+					<div><dt>Current score</dt><dd class="cu-big tnum">${score(latest.warning_score)}</dd></div>
+					<div><dt>Previous score</dt><dd class="cu-big tnum">${previous ? score(previous.warning_score) : '—'}</dd></div>
+					<div><dt>Movement</dt><dd class="cu-big tnum">${delta === null ? '—' : signed(delta)}</dd></div>
+					<div><dt>Category</dt><dd>${riskBadge(latest.risk_category)}${previous && previous.risk_category !== latest.risk_category ? html`<span class="note"> from ${previous.risk_category}</span>` : ''}</dd></div>
+				</dl>
+				${previous ? '' : html`<p class="note">Only one assessment is stored, so there is no previous score to compare.</p>`}
+				<h3 class="cu-sub">Component scores</h3>
+				${hbars(
+					SCORE_COMPONENTS.map((c) => ({
+						label: c.label,
+						value: values[c.key] ?? 0,
+						display: score(values[c.key]),
+						tip: `${c.label}: ${score(values[c.key])} of 100\n${c.detail}`,
+						// Only the backend's own threshold is used: risk components above 20 are active signals.
+						cls: c.risk ? ((values[c.key] ?? 0) > 20 ? 'fill-risk-high' : 'fill-neutral') : 'fill-accent-soft',
+						note: c.risk ? undefined : 'Higher means a more complete repayment history.',
+					})),
+					{ max: 100, label: 'Component scores of the latest assessment' },
+				)}
+				<p class="note">Bars are 0 to 100. Risk components above 20 are highlighted because the watchlist counts them as active signals.</p>
+			</div>`;
+	}
+
+	function signals(s: State): Html {
+		const latest = s.detail.assessments[0];
+		if (!latest) return emptyState('No warning signals', 'Signals are recorded with each assessment.');
+		return html`<div class="panel__head"><h2 class="panel__title">Warning signals</h2><span class="panel__meta">Recorded with the assessment of ${epochDate(latest.assessed_at)}</span></div>
+			${latest.top_indicators.length
+				? html`<ol class="signal-list">${latest.top_indicators.map((i) => html`<li>${i}</li>`)}</ol>`
+				: emptyState('No indicators were recorded for this assessment')}
+			<p class="note">Indicators come from the deterministic engine (core repayment rules and family scores, scoring version 1.0). Machine-learning models are not used in scoring.</p>
+			<div id="cu-explain"></div>`;
+	}
+
+	function scoreHistory(s: State): Html {
+		const all = [...s.detail.assessments].sort((a, b) => a.assessed_at - b.assessed_at);
+		return html`<div class="panel__head"><div><h2 class="panel__title">Score history</h2><span class="panel__meta">${count(all.length)} stored assessment${all.length === 1 ? '' : 's'}</span></div>
+			<div class="segmented" role="group" aria-label="Period" id="cu-period">
+				${[['30', '30 days'], ['90', '90 days'], ['365', '1 year'], ['0', 'All']].map(
+					([d, label]) => html`<button type="button" data-days="${d}" aria-pressed="${String(Number(d) === s.period)}">${label}</button>`,
+				)}
+			</div></div>
+			<div class="chart" id="cu-history-chart"></div>
+			<div id="cu-history-table"></div>`;
+	}
+
+	function drawHistory(s: State) {
+		const since = s.period ? Date.now() / 1000 - s.period * 86400 : 0;
+		const points = s.detail.assessments
+			.filter((a) => a.assessed_at >= since)
+			.map((a) => ({ x: a.assessed_at, y: a.warning_score, tip: `${score(a.warning_score)}, ${a.risk_category}\n${epochDateTime(a.assessed_at)}`, cls: `fill-risk-${riskClass(a.risk_category)}` }));
+		const el = $('#cu-history-chart');
+		if (!el) return;
+		if (points.length < 2) {
+			mount(el, emptyState(points.length ? 'One assessment in this period' : 'No assessments in this period', 'A trend line appears once there are at least two assessments.'));
+		} else {
+			responsive(el, (w) => line(points, w, { height: 220, yDomain: [0, 100], xFormat: epochShort, label: 'Warning score over time', area: true }));
+		}
+		mount(
+			$('#cu-history-table'),
+			tableView('Assessment history', ['Assessed', 'Score', 'Category'], points.map((p) => [epochDateTime(p.x), score(p.y), p.tip.split(', ')[1]?.split('\n')[0] ?? ''])),
+		);
+	}
+
+	function repayments(s: State): Html {
+		const { repayments: rows, loans } = s.detail;
+		if (!rows.length) return html`<div class="panel__head"><h2 class="panel__title">Repayment analysis</h2></div>${emptyState('No repayment records', 'Upload repayments for this customer’s loans to analyse delinquency.')}`;
+		const loanRef = new Map(loans.map((l) => [l.id, l.loan_id]));
+		const due = rows.reduce((t, r) => t + r.amount_due, 0);
+		const paid = rows.reduce((t, r) => t + r.amount_paid, 0);
+		const byStatus = rows.reduce<Record<string, number>>((m, r) => ((m[r.repayment_status] = (m[r.repayment_status] ?? 0) + 1), m), {});
+		const maxDpd = Math.max(0, ...rows.map((r) => r.dpd));
+		const shown = s.showAllRepayments ? [...rows].reverse() : [...rows].reverse().slice(0, 12);
+		return html`<div class="panel__head"><h2 class="panel__title">Repayment analysis</h2><span class="panel__meta">${count(rows.length)} instalments</span></div>
+			<dl class="facts">
+				<div><dt>Amount due</dt><dd class="tnum">${money(due)}</dd></div>
+				<div><dt>Amount paid</dt><dd class="tnum">${money(paid)}</dd></div>
+				<div><dt>Paid of due</dt><dd class="tnum">${due ? pct(paid / due, 1) : '—'}</dd></div>
+				<div><dt>Highest days past due</dt><dd class="tnum">${count(maxDpd)}</dd></div>
+			</dl>
+			<ul class="legend cu-status-legend">${Object.entries(byStatus).map(
+				([k, n]) => html`<li><span class="swatch ${STATUS_CLASS[REPAYMENT_STATUS_TONE[k] ?? 'neutral']}" aria-hidden="true"></span>${humanize(k)} ${count(n)}</li>`,
+			)}</ul>
+			<div class="chart" id="cu-dpd-chart"></div>
+			<p class="note">Days past due per instalment, in due-date order; colour shows the recorded repayment status.</p>
+			<div class="table-wrap cu-table"><table class="table table--compact"><thead><tr><th>Due</th><th>Paid on</th><th>Loan</th><th class="num">Due</th><th class="num">Paid</th><th class="num">DPD</th><th>Status</th></tr></thead>
+			<tbody>${shown.map(
+				(r) => html`<tr><td class="nowrap">${isoDate(r.due_date)}</td><td class="nowrap">${r.payment_date ? isoDate(r.payment_date) : html`<span class="muted">Not paid</span>`}</td>
+					<td class="nowrap">${loanRef.get(r.loan_id) ?? '—'}</td><td class="num">${money(r.amount_due)}</td><td class="num">${money(r.amount_paid)}</td><td class="num">${r.dpd}</td>
+					<td>${pill(humanize(r.repayment_status), REPAYMENT_STATUS_TONE[r.repayment_status] ?? 'neutral')}</td></tr>`,
+			)}</tbody></table></div>
+			${rows.length > 12 ? html`<button type="button" class="btn btn--link cu-more" data-act="all-repayments">${s.showAllRepayments ? 'Show the latest 12' : `Show all ${count(rows.length)} instalments`}</button>` : ''}`;
+	}
+
+	function drawDpd(s: State) {
+		const el = $('#cu-dpd-chart');
+		if (!el || !s.detail.repayments.length) return;
+		const pts = s.detail.repayments.map((r) => ({
+			label: isoDate(r.due_date).replace(/^\d+ /, ''),
+			value: r.dpd,
+			cls: STATUS_CLASS[REPAYMENT_STATUS_TONE[r.repayment_status] ?? 'neutral'],
+			tip: `Due ${isoDate(r.due_date)}\n${humanize(r.repayment_status)}, ${r.dpd} days past due\nPaid ${money(r.amount_paid)} of ${money(r.amount_due)}`,
+		}));
+		responsive(el, (w) => columns(pts, w, { height: 180, label: 'Days past due per instalment' }));
+	}
+
+	function facilities(s: State): Html {
+		const loans = s.detail.loans;
+		if (!loans.length) return html`<div class="panel__head"><h2 class="panel__title">Facilities</h2></div>${emptyState('No loan facilities recorded')}`;
+		const sanctioned = loans.reduce((t, l) => t + l.sanctioned_amount, 0);
+		const outstanding = loans.reduce((t, l) => t + l.outstanding_balance, 0);
+		return html`<div class="panel__head"><h2 class="panel__title">Facilities</h2><span class="panel__meta">${count(loans.length)} loan${loans.length === 1 ? '' : 's'}</span></div>
+			<dl class="facts"><div><dt>Total sanctioned</dt><dd class="tnum">${money(sanctioned)}</dd></div><div><dt>Total outstanding</dt><dd class="tnum">${money(outstanding)}</dd></div>
+				<div><dt>Outstanding of sanctioned</dt><dd class="tnum">${sanctioned ? pct(outstanding / sanctioned, 1) : '—'}</dd></div></dl>
+			<div class="table-wrap cu-table"><table class="table table--compact"><thead><tr><th>Loan</th><th>Product</th><th class="num">Sanctioned</th><th class="num">Outstanding</th><th class="num">Of sanctioned</th><th class="num">Instalment</th><th>Status</th></tr></thead>
+			<tbody>${loans.map(
+				(l) => html`<tr><td class="id nowrap">${l.loan_id}</td><td class="nowrap">${l.product_type ? humanize(l.product_type) : '—'}</td><td class="num">${money(l.sanctioned_amount)}</td><td class="num">${money(l.outstanding_balance)}</td>
+					<td class="num">${l.sanctioned_amount ? pct(l.outstanding_balance / l.sanctioned_amount, 0) : '—'}</td><td class="num">${money(l.instalment_amount)}</td>
+					<td>${pill(humanize(l.status), l.status === 'active' ? 'info' : 'neutral')}</td></tr>`,
+			)}</tbody></table></div>
+			<p class="note">Outstanding of sanctioned is the balance ratio of each term facility; revolving utilisation comes from exposure snapshots below.${l0(loans)}</p>`;
+	}
+	const l0 = (loans: CustomerDetail['loans']) => (loans.some((l) => l.disbursement_date) ? '' : ' Disbursement dates were not provided.');
+
+	function latestCalc(ws: Workspace, name: string): { calc: Calculation; round: number } | null {
+		let found: { calc: Calculation; round: number } | null = null;
+		for (const f of ws.findings) {
+			for (const c of f.calculations) if (c.name === name && (!found || f.round >= found.round)) found = { calc: c, round: f.round };
+		}
+		return found;
+	}
+
+	function cashflowExposure(s: State, ctx: PageContext): Html {
+		if (s.ws === undefined) return skeleton(4);
+		const head = html`<div class="panel__head"><h2 class="panel__title">Cash flow and exposure</h2><span class="panel__meta">From the latest investigation's recorded calculations</span></div>`;
+		if (!s.ws) {
+			return html`${head}${emptyState(
+				'No cash-flow or exposure analysis yet',
+				'The customer API does not return cash-flow or exposure records. They are analysed, with cited records, when an investigation runs.',
+				!s.investigations.some((i) => OPEN_STATUSES.has(i.status)) && can(ctx.user.role, 'initiate_investigation')
+					? html`<button type="button" class="btn btn--secondary btn--sm" data-act="investigate">Start investigation</button>`
+					: undefined,
+			)}`;
+		}
+		const cash = latestCalc(s.ws, 'cashflow_profile');
+		const exp = latestCalc(s.ws, 'exposure_profile');
+		const provenance = (x: { calc: Calculation; round: number }) =>
+			html`<p class="note">Calculation ${x.calc.name} v${x.calc.version}, round ${x.round} of <a href="/investigation?id=${encodeURIComponent(s.ws!.id)}">this investigation</a>, ${count(x.calc.input_record_count)} input records, digest ${x.calc.input_digest.slice(0, 12)}.</p>`;
+		const co = cash?.calc.output as Record<string, any> | undefined;
+		const eo = exp?.calc.output as Record<string, any> | undefined;
+		return html`${head}<div class="cu-cx">
+			<div class="cu-cx__col">
+				<h3 class="cu-sub">Monthly inflows</h3>
+				${co
+					? html`<div class="chart" id="cu-cash-chart"></div>
+						<dl class="facts"><div><dt>Baseline mean inflow</dt><dd class="tnum">${moneyCompact(co.baseline_mean_inflow)}</dd></div>
+							<div><dt>Recent mean inflow</dt><dd class="tnum">${moneyCompact(co.recent_mean_inflow)}</dd></div>
+							<div><dt>Change vs baseline</dt><dd class="tnum">${signedPct(co.change_vs_baseline)}</dd></div>
+							<div><dt>Months below baseline</dt><dd class="tnum">${count(co.months_below_baseline_streak)}</dd></div>
+							<div><dt>Recent months with net outflow</dt><dd class="tnum">${count(co.net_negative_recent)}</dd></div>
+							<div><dt>Months analysed</dt><dd class="tnum">${count(co.months)}${co.gaps?.length ? `, ${co.gaps.length} gaps` : ''}</dd></div></dl>
+						${co.seasonality?.explains_decline ? html`<p class="callout callout--info">The engine found the decline consistent with the same months last year (seasonal).</p>` : ''}
+						${provenance(cash!)}`
+					: emptyState('No cash-flow calculation recorded', 'The cash-flow specialist did not run in this investigation, or no cash-flow records were available.')}
+			</div>
+			<div class="cu-cx__col">
+				<h3 class="cu-sub">Exposure and utilisation</h3>
+				${eo
+					? html`${eo.series?.length > 1 ? html`<div class="chart" id="cu-exp-chart"></div>` : ''}
+						<dl class="facts"><div><dt>Latest utilisation</dt><dd class="tnum">${eo.latest_utilisation === null ? '—' : pct(eo.latest_utilisation)}</dd></div>
+							<div><dt>Utilisation change</dt><dd class="tnum">${eo.utilisation_change === null ? '—' : signedPct(eo.utilisation_change)}</dd></div>
+							<div><dt>Exposure growth</dt><dd class="tnum">${eo.exposure_growth === null ? '—' : signedPct(eo.exposure_growth)}</dd></div>
+							<div><dt>Monthly obligations</dt><dd class="tnum">${moneyCompact(eo.monthly_obligations)}</dd></div>
+							<div><dt>Exposure at risk</dt><dd class="tnum">${moneyCompact(eo.exposure_at_risk)}</dd></div>
+							<div><dt>Source</dt><dd>${humanize(eo.source)}, ${count(eo.snapshots)} snapshots</dd></div></dl>
+						${provenance(exp!)}`
+					: emptyState('No exposure calculation recorded', 'The exposure specialist did not run in this investigation.')}
+			</div>
+		</div>`;
+	}
+
+	function drawCashExposure(s: State) {
+		if (!s.ws) return;
+		const co = latestCalc(s.ws, 'cashflow_profile')?.calc.output as Record<string, any> | undefined;
+		const cashEl = $('#cu-cash-chart');
+		if (co && cashEl && Array.isArray(co.inflow_series) && co.inflow_series.length) {
+			const months: number[] = co.month_index ?? co.inflow_series.map((_: number, i: number) => i + 1);
+			const pts = co.inflow_series.map((v: number, i: number) => ({ x: months[i] ?? i, y: v, tip: `Month ${months[i] ?? i + 1}\nInflow ${money(v)}` }));
+			responsive(cashEl, (w) =>
+				line(pts, w, {
+					height: 190,
+					xFormat: (x) => `Month ${Math.round(x)}`,
+					yFormat: (v) => moneyCompact(v),
+					references: co.baseline_mean_inflow ? [{ y: co.baseline_mean_inflow, label: `Baseline mean ${moneyCompact(co.baseline_mean_inflow)}` }] : [],
+					label: 'Monthly inflow, last 12 months analysed',
+				}),
+			);
+		}
+		const eo = latestCalc(s.ws, 'exposure_profile')?.calc.output as Record<string, any> | undefined;
+		const expEl = $('#cu-exp-chart');
+		if (eo && expEl && eo.series?.length > 1) {
+			const pts = eo.series.map((p: { date: string; utilisation: number }) => ({ x: new Date(p.date).getTime() / 1000, y: p.utilisation, tip: `${isoDate(p.date)}\nUtilisation ${pct(p.utilisation)}` }));
+			if (pts.every((p: { x: number }) => Number.isFinite(p.x))) {
+				responsive(expEl, (w) => line(pts, w, { height: 190, yDomain: [0, Math.max(1, ...pts.map((p: { y: number }) => p.y))], xFormat: epochShort, yFormat: (v) => pct(v), label: 'Utilisation by snapshot date' }));
+			}
+		}
+	}
+
+	function investigationsPanel(s: State): Html {
+		const head = html`<div class="panel__head"><h2 class="panel__title">Investigations</h2><a class="btn btn--link" href="/investigations">All investigations</a></div>`;
+		if (!s.investigations.length) {
+			return html`${head}${emptyState('No investigations for this customer', s.investigationsCapped ? 'Only the 200 most recently updated investigations were searched.' : '')}`;
+		}
+		return html`${head}<ul class="list">${s.investigations.map((i) => {
+			const cls = i.effective_classification;
+			return html`<li class="row"><span class="row__main"><span class="row__title"><a href="/investigation?id=${encodeURIComponent(i.id)}">Started ${epochDate(i.created_at)}</a></span>
+				<span class="row__sub">Round ${i.round}, ${humanize(i.trigger)}, updated ${relative(i.updated_at)}${cls?.classification ? `, ${textOf(CLASSIFICATION, cls.classification)}` : ''}</span></span>${statusPill(i.status)}</li>`;
+		})}</ul>${s.investigationsCapped ? html`<p class="note">Searched the 200 most recently updated investigations.</p>` : ''}`;
+	}
+
+	function review(s: State, ctx: PageContext): Html {
+		const latest = s.detail.assessments[0];
+		const alerts = s.detail.alerts;
+		const canDecide = can(ctx.user.role, 'complete_analyst_review');
+		const byAssessment = new Map(s.detail.assessments.map((a) => [a.id, a]));
+		const history = alerts.length
+			? html`<ul class="list decisions">${alerts.map((a) => {
+					const at = byAssessment.get(a.assessment_id);
+					return html`<li><div class="row"><span class="row__title">${a.decision}</span><span class="row__sub">${epochDateTime(a.created_at)}</span></div>
+						<p class="decision__reason">${a.reason}</p>
+						<p class="note">${a.analyst_id === ctx.user.id ? 'Recorded by you' : 'Recorded by another analyst'}. Original assessment ${score(a.original_score)}, ${a.original_category}${at ? ` (${epochDate(at.assessed_at)})` : ''}; it is preserved unchanged.</p>
+						${a.preserved_evidence?.top_indicators?.length
+							? html`<details class="disclosure"><summary class="row__sub">Evidence preserved with the decision</summary><ul class="signal-list signal-list--sm">${a.preserved_evidence.top_indicators.map((i) => html`<li>${i}</li>`)}</ul>
+								${a.preserved_evidence.rule_scores ? html`<p class="note">${Object.entries(a.preserved_evidence.rule_scores).map(([k, v]) => `${humanize(k)} ${score(v)}`).join(', ')}</p>` : ''}</details>`
+							: ''}</li>`;
+				})}</ul>`
+			: html`<p class="note">No analyst decision has been recorded for this customer.</p>`;
+		return html`<div class="panel__head"><h2 class="panel__title">Analyst review</h2></div>
+			${latest && canDecide
+				? html`<p class="secondary cu-review__lede">Classify the latest alert (score ${score(latest.warning_score)}, ${latest.risk_category}, ${epochDate(latest.assessed_at)}). The assessment itself is never changed.</p>
+					<div class="btn-row cu-decisions">${ALERT_DECISIONS.map((d) => html`<button type="button" class="btn btn--secondary btn--sm" data-decision="${d}">${d}</button>`)}</div>`
+				: latest
+					? html`<p class="note">Your role can read analyst decisions but not record them.</p>`
+					: html`<p class="note">There is no assessment to classify yet.</p>`}
+			<h3 class="cu-sub">Decision history</h3>${history}`;
+	}
+
+	// ── Actions ──────────────────────────────────────────────────────────
+
+	function decide(decision: string, latest: WarningAssessment, s: State, ctx: PageContext) {
+		openDialog({
+			title: decision,
+			description: DECISION_HINT[decision],
+			fields: [{ name: 'reason', label: 'Reason for the decision', type: 'textarea', required: true, minLength: 1, maxLength: 2000, placeholder: 'What evidence supports this classification?' }],
+			submit: 'Record decision',
+			confirm: (v) =>
+				summary(
+					[
+						['Customer', s.detail.customer.customer_id],
+						['Decision', decision],
+						['Applies to', `Assessment of ${epochDateTime(latest.assessed_at)}, score ${score(latest.warning_score)} (${latest.risk_category})`],
+						['Reason', v.reason],
+					],
+					'The decision is stored with your identity and the evidence of this assessment, and cannot be edited afterwards.',
+				),
+			onSubmit: async (v) => {
+				await classifyAlert(latest.id, decision as (typeof ALERT_DECISIONS)[number], v.reason);
+				toast(`Recorded "${decision}" for ${s.detail.customer.customer_id}.`);
+				await render(ctx, true);
+			},
+		});
+	}
+
+	function startInvestigation(s: State) {
+		openDialog({
+			title: 'Start an investigation',
+			description: 'The investigation director selects specialists for this customer. Agents read the customer’s records, cite evidence, and stop for human review where policy requires it.',
+			fields: [
+				{ name: 'question', label: 'Question for the investigation (optional)', type: 'textarea', maxLength: 1000, placeholder: 'For example: is the recent delinquency temporary or sustained?' },
+				{ name: 'context', label: 'Context you already know (optional)', type: 'textarea', maxLength: 4000, hint: 'Shared with agents as untrusted context, never as an instruction.' },
+				{ name: 'context_category', label: 'Context category', type: 'select', options: [{ value: '', text: 'No context category' }, ...CONTEXT_CATEGORIES.map((c) => ({ value: c, text: CONTEXT_CATEGORY[c] }))] },
+			],
+			submit: 'Start investigation',
+			onSubmit: async (v) => {
+				try {
+					const ws = await initiate({
+						scope: 'customer',
+						customer_id: s.detail.customer.customer_id,
+						question: v.question || undefined,
+						context: v.context || undefined,
+						context_category: v.context ? v.context_category || 'other' : undefined,
+					});
+					toast('Investigation started.');
+					void navigate(`/investigation?id=${encodeURIComponent(ws.id)}`);
+				} catch (error) {
+					if (error instanceof ApiError && error.status === 409) throw new Error(`${error.message}. Open it from the investigations list.`);
+					throw error;
+				}
+			},
+		});
+	}
+
+	async function showExplanation(s: State, ctx: PageContext) {
+		const el = $('#cu-explain');
+		if (!el) return;
+		el.scrollIntoView({ block: 'nearest' });
+		mount(el, html`<div class="cu-explain">${skeleton(3)}</div>`);
+		try {
+			const r = await explain(s.detail.customer.customer_id, ctx.signal);
+			mount(
+				el,
+				html`<div class="cu-explain"><h3 class="cu-sub">Explanation</h3><p>${r.explanation}</p>
+					${r.contributing_factors.length
+						? hbars(
+								r.contributing_factors.map((f) => ({ label: humanize(f.signal), value: f.score, display: score(f.score), tip: `${humanize(f.signal)} family score ${score(f.score)}` })),
+								{ max: 100, label: 'Family scores behind the explanation' },
+							)
+						: ''}
+					<p class="note">The explanation re-evaluates the customer's current records with the active policy, so it can differ from a stored assessment if data has changed since. Narrative text is marked when the AI explainer is unavailable.</p></div>`,
+			);
+		} catch (error) {
+			if (!isAbort(error)) mount(el, errorState(error, false));
+		}
+	}
+
+	// ── Page ─────────────────────────────────────────────────────────────
+
+	let state: State | null = null;
+
+	function paint(s: State, ctx: PageContext) {
+		const root = $('#cu-root')!;
+		mount(
+			root,
+			html`${header(s, ctx)}
+			<div class="grid cu-grid">
+				<section class="panel col-8">${riskOverview(s)}</section>
+				<section class="panel col-4 cu-review">${review(s, ctx)}</section>
+				<section class="panel col-6">${signals(s)}</section>
+				<section class="panel col-6">${scoreHistory(s)}</section>
+				<section class="panel col-7">${repayments(s)}</section>
+				<section class="panel col-5">${facilities(s)}</section>
+				<section class="panel col-8" id="cu-cx">${s.ws === undefined ? skeleton(4) : cashflowExposure(s, ctx)}</section>
+				<section class="panel col-4">${investigationsPanel(s)}</section>
+			</div>`,
+		);
+		drawHistory(s);
+		drawDpd(s);
+		drawCashExposure(s);
+	}
+
+	async function render(ctx: PageContext, fresh = false) {
+		const id = ctx.params.get('id')?.trim();
+		const root = $('#cu-root')!;
+		if (!id) {
+			mount(root, emptyState('No customer selected', 'Open a customer from the watchlist.', html`<a class="btn btn--primary btn--sm" href="/watchlist">Go to the watchlist</a>`));
+			return;
+		}
+		mount($('#cu-crumb'), id);
+		document.title = `${id} · CredX`;
+		if (!fresh || !state) mount(root, html`<div class="panel">${skeleton(6)}</div>`);
+		try {
+			const [detail, invs] = await Promise.all([
+				fetchCustomer(id),
+				can(ctx.user.role, 'view_investigation') ? listInvestigations({ limit: 200 }).catch(() => ({ items: [] as InvestigationSummary[] })) : Promise.resolve({ items: [] as InvestigationSummary[] }),
+			]);
+			if (ctx.signal.aborted) return;
+			const mine = invs.items.filter((i) => i.scope === 'customer' && i.customer_id === detail.customer.customer_id);
+			state = {
+				detail,
+				investigations: mine,
+				investigationsCapped: invs.items.length >= 200,
+				ws: mine.length ? undefined : null,
+				period: state?.period ?? 0,
+				showAllRepayments: false,
+			};
+			paint(state, ctx);
+			// Cash flow and exposure come from the latest investigation's recorded calculations.
+			const latestInv = mine[0];
+			if (latestInv) {
+				const cx = $('#cu-cx');
+				try {
+					const ws = await workspace(latestInv.id, ctx.signal);
+					if (ctx.signal.aborted || !state) return;
+					state.ws = ws;
+				} catch (error) {
+					if (isAbort(error) || ctx.signal.aborted) return;
+					if (state) state.ws = null;
+				}
+				if (cx && state) {
+					mount(cx, cashflowExposure(state, ctx));
+					drawCashExposure(state);
+				}
+			}
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			if (error instanceof ApiError && error.notFound) {
+				mount(root, html`<div class="panel">${emptyState(`Customer ${id} was not found`, 'The ID may be wrong, or the customer is outside your data scope. IDs must match exactly.', html`<a class="btn btn--secondary btn--sm" href="/watchlist">Back to the watchlist</a>`)}</div>`);
+				return;
+			}
+			mount(root, html`<div class="panel">${errorState(error)}</div>`);
+			$('[data-retry]', root)?.addEventListener('click', () => void render(ctx), { once: true });
+		}
+	}
+
+	definePage('customer', async (ctx) => {
+		state = null;
+		const root = $('#cu-root')!;
+		root.addEventListener('click', async (e) => {
+			const target = e.target as HTMLElement;
+			const s = state;
+			if (!s) return;
+			const decision = target.closest<HTMLElement>('[data-decision]')?.dataset.decision;
+			if (decision && s.detail.assessments[0]) return decide(decision, s.detail.assessments[0], s, ctx);
+			const days = target.closest<HTMLElement>('#cu-period [data-days]')?.dataset.days;
+			if (days !== undefined) {
+				s.period = Number(days);
+				$$('#cu-period button').forEach((b) => b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.days === days)));
+				return drawHistory(s);
+			}
+			const act = target.closest<HTMLElement>('[data-act]')?.dataset.act;
+			if (act === 'investigate') return startInvestigation(s);
+			if (act === 'explain') return void showExplanation(s, ctx);
+			if (act === 'all-repayments') {
+				s.showAllRepayments = !s.showAllRepayments;
+				const section = target.closest('section');
+				if (section) {
+					mount(section, repayments(s));
+					drawDpd(s);
+				}
+				return;
+			}
+			if (act === 'assess') {
+				const button = target.closest('button') as HTMLButtonElement;
+				button.disabled = true;
+				button.classList.add('is-busy');
+				try {
+					const r = await runAssessment(s.detail.customer.customer_id);
+					const a = r.assessments[0];
+					toast(a ? `Assessed ${a.customer_id}: ${score(a.warning_score)}, ${a.risk_category}.` : 'Assessment recorded.');
+					await render(ctx, true);
+				} catch (error) {
+					toast(`Assessment failed: ${failureMessage(error)}`, 'critical');
+					button.disabled = false;
+					button.classList.remove('is-busy');
+				}
+			}
+		});
+		await render(ctx);
+	});
+</script>

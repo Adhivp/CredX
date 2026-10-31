@@ -1,0 +1,121 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Review centre" page="reviews">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Review centre</h1>
+			<p class="page-head__lede" id="rv-lede">Cases waiting for a human decision in your queues, oldest first.</p>
+		</div>
+	</header>
+	<div class="rv-layout">
+		<section class="panel panel--flush rv-queue" aria-labelledby="rv-queue-title">
+			<div class="rv-queue__head"><h2 class="panel__title" id="rv-queue-title">Queue</h2><span class="panel__meta" id="rv-count"></span></div>
+			<div id="rv-list"></div>
+		</section>
+		<section class="rv-detail" id="rv-detail" aria-live="polite"></section>
+	</div>
+</AppShell>
+
+<script>
+	import { reviewQueue } from '../lib/api/governance';
+	import { workspace } from '../lib/api/investigations';
+	import { isAbort } from '../lib/api/client';
+	import { age, humanize, shortId } from '../lib/format';
+	import { html, mount, type Html } from '../lib/html';
+	import { CLASSIFICATION, QUEUE, SEVERITY, textOf, toneOf } from '../lib/labels';
+	import { $, $$, definePage, setParams, type PageContext } from '../lib/page';
+	import { roleLabel } from '../lib/permissions';
+	import type { ReviewQueue, ReviewQueueItem } from '../lib/types';
+	import { emptyState, errorState, load, pill, skeleton } from '../lib/ui';
+	import { createWorkspace } from '../lib/workspace';
+
+	let queue: ReviewQueue | null = null;
+	let selected: string | null = null;
+
+	function item(i: ReviewQueueItem): Html {
+		const inv = i.investigation;
+		const cls = inv.effective_classification;
+		return html`<li><button type="button" class="rv-item" data-item="${i.review_item_id}" aria-current="${String(i.review_item_id === selected)}">
+			<span class="row"><span class="row__title">${inv.customer_id ?? `Portfolio: ${inv.segment ? humanize(inv.segment) : 'all segments'}`}</span><span class="row__sub">${age(i.created_at)} waiting</span></span>
+			<span class="row__sub">Case ${shortId(inv.id)}, ${QUEUE[i.queue] ?? humanize(i.queue)}, ${humanize(i.stage)}</span>
+			<span class="rv-item__pills">${cls?.classification ? pill(textOf(CLASSIFICATION, cls.classification), toneOf(CLASSIFICATION, cls.classification)) : ''}${cls ? pill(textOf(SEVERITY, cls.severity), toneOf(SEVERITY, cls.severity)) : ''}</span>
+			${i.reasons.length ? html`<span class="rv-item__reason">${i.reasons[0]}${i.reasons.length > 1 ? ` (+${i.reasons.length - 1} more)` : ''}</span>` : ''}
+			<span class="row__sub">${i.assigned_to_me ? 'Assigned to you' : i.assigned_to ? 'Assigned to another reviewer' : 'Unassigned'}; for a ${roleLabel(i.required_role).toLowerCase()}</span>
+		</button></li>`;
+	}
+
+	function renderList() {
+		if (!queue) return;
+		mount($('#rv-count'), `${queue.items.length} open`);
+		mount(
+			$('#rv-lede'),
+			queue.queues.length
+				? `Cases waiting for a human decision in your queues (${queue.queues.map((q) => QUEUE[q] ?? humanize(q)).join(', ')}), oldest first. Queues follow your role, ${roleLabel(queue.role).toLowerCase()}.`
+				: `Your role, ${roleLabel(queue.role).toLowerCase()}, has no review queue.`,
+		);
+		mount(
+			$('#rv-list'),
+			queue.items.length
+				? html`<ul class="rv-list">${queue.items.map(item)}</ul>`
+				: emptyState('Nothing waiting for review', 'Investigations that need your decision appear here as soon as agents request a human.'),
+		);
+	}
+
+	async function show(ctx: PageContext, reviewItemId: string | null) {
+		selected = reviewItemId;
+		setParams({ item: reviewItemId });
+		$$<HTMLElement>('.rv-item').forEach((b) => b.setAttribute('aria-current', String(b.dataset.item === reviewItemId)));
+		const detail = $('#rv-detail')!;
+		const entry = queue?.items.find((i) => i.review_item_id === reviewItemId);
+		if (!entry) {
+			mount(detail, html`<div class="panel">${emptyState(queue?.items.length ? 'Select a case' : 'No case selected', queue?.items.length ? 'Choose a case from the queue to review its evidence and record a decision.' : '')}</div>`);
+			return;
+		}
+		// A fresh container per case, so the workspace's listeners never stack up.
+		const host = document.createElement('div');
+		detail.replaceChildren(host);
+		mount(host, html`<div class="panel">${skeleton(8)}</div>`);
+		try {
+			const ws = await workspace(entry.investigation.id, ctx.signal);
+			if (ctx.signal.aborted || selected !== reviewItemId) return;
+			createWorkspace(host, ws, ctx, { mode: 'review' });
+			if (window.matchMedia('(max-width: 1100px)').matches) host.scrollIntoView({ block: 'start' });
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			mount(host, html`<div class="panel">${errorState(error)}</div>`);
+		}
+	}
+
+	async function refresh(ctx: PageContext, keep: string | null) {
+		const previous = queue?.items.find((i) => i.review_item_id === keep)?.investigation.id;
+		const data = await load($('#rv-list'), reviewQueue, () => html``, { signal: ctx.signal, loading: skeleton(5) });
+		if (!data || ctx.signal.aborted) return;
+		queue = data;
+		const stillOpen = keep && data.items.some((i) => i.review_item_id === keep);
+		selected = stillOpen ? keep : null;
+		renderList();
+		if (!stillOpen && keep) {
+			mount($('#rv-detail'), html`<div class="panel">${emptyState('This case has left your queue', 'Your decision moved it to its next stage. Every decision stays on the investigation record.', previous ? html`<a class="btn btn--secondary btn--sm" href="/investigation?id=${encodeURIComponent(previous)}">Open the investigation</a>` : undefined)}</div>`);
+			setParams({ item: null });
+		}
+	}
+
+	definePage('reviews', async (ctx) => {
+		queue = null;
+		selected = null;
+		$('#rv-list')?.addEventListener('click', (e) => {
+			const id = (e.target as HTMLElement).closest<HTMLElement>('[data-item]')?.dataset.item;
+			if (id) void show(ctx, id);
+		});
+		// After a decision the case may leave the queue; refresh it from the API.
+		document.addEventListener('credx:workspace-changed', () => void refresh(ctx, selected), { signal: ctx.signal });
+		await refresh(ctx, null);
+		const loaded = queue as ReviewQueue | null; // assigned inside refresh()
+		if (!loaded) return;
+		const wanted = ctx.params.get('item');
+		const initial = loaded.items.find((i) => i.review_item_id === wanted)?.review_item_id ?? (window.matchMedia('(min-width: 1101px)').matches ? loaded.items[0]?.review_item_id ?? null : null);
+		await show(ctx, initial);
+	});
+</script>

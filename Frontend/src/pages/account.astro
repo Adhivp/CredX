@@ -1,0 +1,67 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Account" page="account">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Account and system status</h1>
+			<p class="page-head__lede">Your access and the state of the services behind CredX.</p>
+		</div>
+		<div class="page-head__actions"><button type="button" class="btn btn--secondary" data-action="sign-out">Sign out</button></div>
+	</header>
+	<div class="grid">
+		<section class="panel col-6" id="ac-profile"></section>
+		<section class="panel col-6" id="ac-system"></section>
+	</div>
+</AppShell>
+
+<script>
+	import { API_BASE, checkHealth } from '../lib/api/client';
+	import { systemStatus } from '../lib/api/governance';
+	import { epochDate, epochDateTime, humanize } from '../lib/format';
+	import { html, mount } from '../lib/html';
+	import { $, definePage } from '../lib/page';
+	import { PERMISSION_LABEL, permissionsOf, roleLabel } from '../lib/permissions';
+	import { load, pill } from '../lib/ui';
+
+	definePage('account', async ({ user, signal }) => {
+		const perms = [...permissionsOf(user.role)];
+		mount(
+			$('#ac-profile'),
+			html`<div class="panel__head"><h2 class="panel__title">Your access</h2></div>
+			<dl class="facts"><div><dt>Name</dt><dd>${user.full_name}</dd></div><div><dt>Email</dt><dd>${user.email}</dd></div>
+				<div><dt>Role</dt><dd>${roleLabel(user.role)}</dd></div><div><dt>Account created</dt><dd>${epochDate(user.created_at)}</dd></div></dl>
+			${user.role === 'unassigned'
+				? html`<p class="callout callout--warning ac-callout">Your account has no role yet. A risk administrator must assign a role and a data scope before you can see customers, investigations or portfolio data.</p>`
+				: html`<h3 class="cu-sub">What your role allows</h3><ul class="ac-perms">${perms.map((p) => html`<li>${PERMISSION_LABEL[p]}</li>`)}</ul>
+					<p class="note">Your data scope, set by a risk administrator, further limits which customers and segments you can see. The API enforces both on every request.</p>`}`,
+		);
+
+		const health = checkHealth();
+		await load(
+			$('#ac-system'),
+			systemStatus,
+			(s) => html`<div class="panel__head"><h2 class="panel__title">System status</h2></div>
+				<ul class="list">
+					<li class="row"><span class="row__main"><span class="row__title">Deterministic scoring engine</span><span class="row__sub">Scoring version ${s.deterministic_engine.scoring_version}</span></span>${pill(humanize(s.deterministic_engine.status), s.deterministic_engine.status === 'available' ? 'good' : 'critical')}</li>
+					<li class="row"><span class="row__main"><span class="row__title">Agent narrative model</span><span class="row__sub">${s.llm.model}; last successful call ${s.llm.last_successful_call_at ? epochDateTime(s.llm.last_successful_call_at) : 'never'}</span></span>${pill(humanize(s.llm.status), s.llm.status === 'configured' ? 'good' : 'warning')}</li>
+					<li class="row"><span class="row__main"><span class="row__title">Machine-learning models</span><span class="row__sub">${s.ml.used_in_scoring ? 'Used in scoring' : 'Not used in scoring'}</span></span>${pill(humanize(s.ml.status), s.ml.used_in_scoring ? 'warning' : 'neutral')}</li>
+					<li class="row"><span class="row__main"><span class="row__title">Institutional policy</span><span class="row__sub">${s.policy.name}</span></span>${pill(`Version ${s.policy.version}`, 'info')}</li>
+					<li class="row"><span class="row__main"><span class="row__title">API</span><span class="row__sub">${API_BASE}</span></span><span data-health>${pill('Checking', 'neutral')}</span></li>
+				</ul>
+				<p class="note ac-note">${s.llm.note}</p>
+				<details class="disclosure ac-ml"><summary>Why the machine-learning models are not used</summary><p class="note">${s.ml.summary}</p>
+					<ul class="signal-list signal-list--sm">${s.ml.findings.map((f) => html`<li>${f}</li>`)}</ul></details>
+				<p class="note ac-note">Amounts are shown in Indian rupees. The API carries no currency field; values are displayed as uploaded.</p>`,
+			{
+				signal,
+				after: () =>
+					void health.then((ok) => {
+						const el = document.querySelector('[data-health]');
+						if (el) mount(el, ok ? pill('Reachable', 'good') : pill('Not reachable', 'critical'));
+					}),
+			},
+		);
+	});
+</script>

@@ -1,0 +1,446 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Overview" page="overview">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title">Portfolio intelligence</h1>
+			<p class="page-head__lede" id="ov-context">Loading your portfolio…</p>
+		</div>
+		<div class="page-head__actions" id="ov-actions"></div>
+	</header>
+
+	<div id="ov-body">
+		<div class="ov-top">
+			<div class="kpis" id="ov-kpis" aria-label="Key figures"></div>
+			<aside class="panel panel--ink ov-risk" id="ov-risk" aria-labelledby="ov-risk-title"></aside>
+		</div>
+
+		<section class="band" aria-labelledby="ov-trend-title">
+			<div class="ov-band">
+				<div class="ov-band__main">
+					<div class="section__head">
+						<div>
+							<h2 class="section__title" id="ov-trend-title">Score trajectory of the highest-risk customers</h2>
+							<p class="section__meta" id="ov-trend-meta">Warning score history from each customer's stored assessments</p>
+						</div>
+						<div class="segmented" role="group" aria-label="Period" id="ov-period">
+							<button type="button" data-days="30" aria-pressed="false">30 days</button>
+							<button type="button" data-days="90" aria-pressed="false">90 days</button>
+							<button type="button" data-days="365" aria-pressed="false">1 year</button>
+							<button type="button" data-days="0" aria-pressed="true">All</button>
+						</div>
+					</div>
+					<div id="ov-trend"></div>
+				</div>
+				<div class="ov-band__side">
+					<div class="section__head">
+						<div>
+							<h2 class="section__title">Needs a decision</h2>
+							<p class="section__meta" id="ov-queue-meta">Open items in your review queues</p>
+						</div>
+						<a class="btn btn--ghost btn--sm" href="/reviews">Review centre</a>
+					</div>
+					<div id="ov-queue"></div>
+				</div>
+			</div>
+		</section>
+
+		<div class="grid section ov-lower">
+			<section class="panel col-4" id="ov-concentration-panel" hidden aria-labelledby="ov-conc-title">
+				<div class="panel__head">
+					<h2 class="panel__title" id="ov-conc-title">Deterioration by product</h2>
+					<a class="btn btn--link" href="/portfolio">Portfolio view</a>
+				</div>
+				<div id="ov-concentration"></div>
+			</section>
+			<section class="panel col-4" aria-labelledby="ov-attn-title">
+				<div class="panel__head">
+					<h2 class="panel__title" id="ov-attn-title">Highest warning scores</h2>
+					<a class="btn btn--link" href="/watchlist">Watchlist</a>
+				</div>
+				<div id="ov-attention"></div>
+			</section>
+			<section class="panel col-4" aria-labelledby="ov-act-title">
+				<div class="panel__head">
+					<h2 class="panel__title" id="ov-act-title">Investigation activity</h2>
+					<a class="btn btn--link" href="/investigations">All investigations</a>
+				</div>
+				<div id="ov-activity"></div>
+			</section>
+		</div>
+	</div>
+</AppShell>
+
+<script>
+	import { customer, portfolioSummary, runAssessment } from '../lib/api/ews';
+	import { portfolioIntelligence, reviewQueue } from '../lib/api/governance';
+	import { list as listInvestigations } from '../lib/api/investigations';
+	import { donut, line, responsive, hbars, tableView } from '../lib/charts';
+	import { count, epochDateTime, epochShort, moneyCompact, pct, relative, age, score, signed, humanize } from '../lib/format';
+	import { html, mount, raw, type Html } from '../lib/html';
+	import { CLASSIFICATION, OPEN_STATUSES, QUEUE, textOf, toneOf } from '../lib/labels';
+	import { $, $$, definePage, type PageContext } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import { RISK_CATEGORIES, type CustomerDetail, type PortfolioIntelligence, type PortfolioSummary } from '../lib/types';
+	import { emptyState, errorState, openDialog, pill, riskBadge, riskClass, skeleton, statusPill, summary as summaryList, toast, failureMessage } from '../lib/ui';
+
+	const ARROW = raw('<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3.5 8.5l5-5M4.5 3.5h4v4"/></svg>');
+	const INVESTIGATION_LIMIT = 200;
+
+	function kpi(label: string, value: string | Html, detail: string | Html, href?: string): Html {
+		const inner = html`<span class="kpi__label">${label}</span>${href ? html`<span class="kpi__go" aria-hidden="true">${ARROW}</span>` : ''}
+			<span class="kpi__value">${value}</span><span class="kpi__detail">${detail}</span>`;
+		return href ? html`<a class="kpi" href="${href}">${inner}</a>` : html`<div class="kpi">${inner}</div>`;
+	}
+
+	function riskPanel(s: PortfolioSummary): Html {
+		const assessed = s.total_assessed;
+		const segments = RISK_CATEGORIES.map((c) => ({
+			key: c,
+			label: c,
+			value: s.risk_distribution[c] ?? 0,
+			cls: `fill-risk-${riskClass(c)}`,
+			tip: `${c}\n${count(s.risk_distribution[c] ?? 0)} customers (${pct(assessed ? (s.risk_distribution[c] ?? 0) / assessed : 0)})`,
+		}));
+		const notAssessed = Math.max(0, s.total_customers - assessed);
+		return html`<div class="panel__head"><h2 class="panel__title" id="ov-risk-title">Risk composition</h2><span class="panel__meta">Latest assessment per customer</span></div>
+			<div class="ov-risk__body">
+				${donut(segments, {
+					size: 176,
+					thickness: 18,
+					label: `Risk categories of ${assessed} assessed customers`,
+					center: html`<span class="ov-risk__total">${count(assessed)}</span><span class="ov-risk__caption">assessed</span>`,
+				})}
+				<ul class="ov-risk__legend">
+					${segments.map(
+						(seg) => html`<li><a href="/watchlist?risk_level=${encodeURIComponent(seg.key)}">${riskBadge(seg.key, 'sm')}</a>
+							<span class="tnum ov-risk__count">${count(seg.value)}</span><span class="tnum ov-risk__share">${pct(assessed ? seg.value / assessed : 0)}</span></li>`,
+					)}
+				</ul>
+			</div>
+			<div class="ov-risk__foot">
+				<div><span class="ov-risk__figure">${assessed ? score(s.average_warning_score) : '—'}</span><span class="ov-risk__caption">average warning score, scored customers only (0–100)</span></div>
+				${notAssessed ? html`<p class="note">${count(notAssessed)} customer${notAssessed === 1 ? '' : 's'} in scope have no assessment yet.</p>` : ''}
+			</div>`;
+	}
+
+	function trendCell(d: CustomerDetail, sinceEpoch: number): Html {
+		const all = [...d.assessments].sort((a, b) => a.assessed_at - b.assessed_at);
+		const latest = all[all.length - 1];
+		const inPeriod = all.filter((a) => a.assessed_at >= sinceEpoch);
+		const previous = all.length > 1 ? all[all.length - 2] : null;
+		const delta = previous ? latest.warning_score - previous.warning_score : null;
+		const id = d.customer.customer_id;
+		return html`<article class="spark">
+			<a class="spark__id" href="/customer?id=${encodeURIComponent(id)}" title="${id}">${id}</a>
+			<div class="spark__figure"><span class="spark__score tnum">${score(latest.warning_score)}</span>${riskBadge(latest.risk_category, 'sm')}</div>
+			<span class="spark__delta">${delta === null ? 'First assessment' : delta === 0 ? 'No change since previous' : `${signed(delta)} since previous`}</span>
+			<div class="chart spark__chart" data-spark="${id}" data-count="${inPeriod.length}"></div>
+			<p class="spark__foot">${inPeriod.length} assessment${inPeriod.length === 1 ? '' : 's'} in period. Latest ${epochDateTime(latest.assessed_at)}</p>
+		</article>`;
+	}
+
+	let trendDetails: CustomerDetail[] = [];
+
+	definePage('overview', async (ctx: PageContext) => {
+		const role = ctx.user.role;
+		const actions = $('#ov-actions');
+		// Run assessment is only offered to roles the API allows to run it.
+		if (can(role, 'run_assessment') && actions) {
+			mount(actions, html`<a class="btn btn--secondary" href="/data">Upload data</a><button type="button" class="btn btn--primary" id="ov-run">Run assessment</button>`);
+			$('#ov-run')?.addEventListener('click', () => confirmRun(ctx));
+		}
+		$$<HTMLButtonElement>('#ov-period button').forEach((button) =>
+			button.addEventListener('click', () => {
+				$$('#ov-period button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+				drawTrend(trendDetails, Number(button.dataset.days));
+			}),
+		);
+		await render(ctx);
+	});
+
+	let lastTotal = 0;
+
+	async function render(ctx: PageContext) {
+		const { user, signal } = ctx;
+		const role = user.role;
+		const canPortfolio = can(role, 'view_portfolio');
+		const kpisEl = $('#ov-kpis');
+		if (kpisEl && !kpisEl.dataset.loaded) mount(kpisEl, skeleton(6));
+		kpisEl?.classList.add('is-refreshing');
+		let summary: PortfolioSummary;
+		try {
+			summary = await portfolioSummary();
+		} catch (error) {
+			if (signal.aborted) return;
+			mount($('#ov-context'), 'Portfolio figures are unavailable.');
+			mount(kpisEl, errorState(error));
+			kpisEl?.querySelector('[data-retry]')?.addEventListener('click', () => void render(ctx), { once: true });
+			return;
+		} finally {
+			kpisEl?.classList.remove('is-refreshing');
+		}
+		if (signal.aborted) return;
+		if (kpisEl) kpisEl.dataset.loaded = 'true';
+		lastTotal = summary.total_customers;
+
+		const runButton = $<HTMLButtonElement>('#ov-run');
+		if (runButton) runButton.hidden = summary.total_customers === 0;
+
+		if (summary.total_customers === 0) {
+			mount($('#ov-context'), 'There are no customers in your data scope yet.');
+			mount(
+				$('#ov-body'),
+				html`<div class="panel">${emptyState(
+					'No portfolio data to monitor',
+					can(role, 'upload_data')
+						? 'Upload customer, loan and repayment files, then run an assessment to populate the early-warning view.'
+						: 'Ask a credit analyst to upload portfolio data, or ask a risk administrator to confirm your data scope.',
+					can(role, 'upload_data') ? html`<a class="btn btn--primary" href="/data">Go to data upload</a>` : undefined,
+				)}</div>`,
+			);
+			return;
+		}
+
+		mount(
+			$('#ov-context'),
+			html`Reporting on ${count(summary.total_customers)} customers in your data scope, ${count(summary.total_assessed)} with a warning assessment.${
+				summary.total_assessed === 0 ? ' Run an assessment to score them.' : ''
+			}`,
+		);
+
+		const [intel, queue, investigations] = await Promise.all([
+			canPortfolio ? portfolioIntelligence().catch((e) => e as Error) : Promise.resolve(null),
+			reviewQueue().catch((e) => e as Error),
+			listInvestigations({ limit: INVESTIGATION_LIMIT }).catch((e) => e as Error),
+		]);
+		if (signal.aborted) return;
+		// KPI matrix
+		const dist = summary.risk_distribution;
+		const highCritical = (dist.High ?? 0) + (dist.Critical ?? 0);
+		const cells: Html[] = [
+			kpi(
+				'Customers monitored',
+				count(summary.total_customers),
+				`${count(summary.total_assessed)} assessed${summary.total_customers > summary.total_assessed ? `, ${count(summary.total_customers - summary.total_assessed)} not yet` : ''}`,
+				'/watchlist',
+			),
+		];
+		if (intel && !(intel instanceof Error)) {
+			cells.push(
+				kpi('Exposure at risk', moneyCompact(intel.total_exposure), `Across ${count(intel.customers)} customers, from the deterministic exposure profile`, '/portfolio'),
+			);
+		}
+		cells.push(
+			kpi('High or critical', count(highCritical), `${count(dist.High ?? 0)} high and ${count(dist.Critical ?? 0)} critical at latest assessment`, '/watchlist'),
+		);
+		if (intel && !(intel instanceof Error)) {
+			const deteriorating = Math.round(intel.portfolio_deteriorating_share * intel.customers);
+			cells.push(
+				kpi('In deterioration', count(deteriorating), `${pct(intel.portfolio_deteriorating_share)} classified as emerging, sustained or accelerating`, '/portfolio'),
+			);
+		}
+		if (!(investigations instanceof Error)) {
+			const open = investigations.items.filter((i) => OPEN_STATUSES.has(i.status)).length;
+			const capped = investigations.items.length >= INVESTIGATION_LIMIT;
+			cells.push(
+				kpi(
+					'Open investigations',
+					capped ? `${count(open)}+` : count(open),
+					capped ? `Counted within the ${INVESTIGATION_LIMIT} most recently updated` : 'Still investigating or awaiting a human',
+					'/investigations',
+				),
+			);
+		}
+		if (!(queue instanceof Error)) {
+			cells.push(
+				kpi(
+					'Pending reviews',
+					count(queue.items.length),
+					queue.queues.length ? `In your queues: ${queue.queues.map((q) => QUEUE[q] ?? humanize(q)).join(', ')}` : 'Your role has no review queue',
+					'/reviews',
+				),
+			);
+		}
+		mount($('#ov-kpis'), html`${cells}`);
+
+		// Risk composition
+		mount($('#ov-risk'), summary.total_assessed ? riskPanel(summary) : html`<div class="panel__head"><h2 class="panel__title" id="ov-risk-title">Risk composition</h2></div>${emptyState('No assessments yet', 'Run an assessment to classify customers.')}`);
+
+		// Review queue (dark band, right)
+		const queueEl = $('#ov-queue');
+		if (queue instanceof Error) mount(queueEl, errorState(queue, false));
+		else if (!queue.items.length) mount(queueEl, emptyState('Nothing waiting for you', 'Investigations that need a human decision appear here.'));
+		else {
+			mount(
+				queueEl,
+				html`<ul class="list ov-queue">${queue.items.slice(0, 5).map((item) => {
+					const inv = item.investigation;
+					const cls = inv.effective_classification;
+					return html`<li><a class="ov-queue__item" href="/reviews?item=${encodeURIComponent(item.review_item_id)}">
+						<span class="row"><span class="row__title">${inv.customer_id ?? `Segment ${inv.segment ?? 'all'}`}</span><span class="row__sub">${age(item.created_at)} waiting</span></span>
+						<span class="row__sub">${QUEUE[item.queue] ?? humanize(item.queue)}: ${item.reasons[0] ? humanize(item.reasons[0]) : humanize(item.stage)}</span>
+						${cls?.classification ? pill(textOf(CLASSIFICATION, cls.classification), toneOf(CLASSIFICATION, cls.classification)) : ''}
+					</a></li>`;
+				})}</ul>${queue.items.length > 5 ? html`<p class="note">${queue.items.length - 5} more in the review centre.</p>` : ''}`,
+			);
+		}
+
+		// Concentration by product
+		if (canPortfolio) {
+			const panel = $('#ov-concentration-panel');
+			if (panel) panel.hidden = false;
+			const el = $('#ov-concentration');
+			if (intel instanceof Error) mount(el, errorState(intel, false));
+			else if (intel) mount(el, concentration(intel));
+		}
+
+		// Highest warning scores
+		const attention = $('#ov-attention');
+		if (!summary.top_risky_customers.length) mount(attention, emptyState('No assessed customers yet'));
+		else {
+			mount(
+				attention,
+				html`<ul class="list">${summary.top_risky_customers.map(
+					(c) => html`<li class="row"><span class="row__main"><span class="row__title"><a href="/customer?id=${encodeURIComponent(c.customer_id)}">${c.customer_id}</a></span>
+						<span class="row__sub">${c.top_indicators[0] ?? 'No indicator recorded'}</span></span>
+						<span class="tnum ov-attn__score">${score(c.warning_score)}</span>${riskBadge(c.risk_category, 'sm')}</li>`,
+				)}</ul>`,
+			);
+		}
+
+		// Investigation activity
+		const activity = $('#ov-activity');
+		if (investigations instanceof Error) mount(activity, errorState(investigations, false));
+		else if (!investigations.items.length) mount(activity, emptyState('No investigations yet', 'Start one from a customer page.'));
+		else {
+			mount(
+				activity,
+				html`<ul class="list">${investigations.items.slice(0, 6).map(
+					(inv) => html`<li class="row"><span class="row__main"><span class="row__title"><a href="/investigation?id=${encodeURIComponent(inv.id)}">${inv.customer_id ?? `Portfolio ${inv.segment ?? 'all segments'}`}</a></span>
+						<span class="row__sub">Round ${inv.round}, updated ${relative(inv.updated_at)}</span></span>${statusPill(inv.status)}</li>`,
+				)}</ul><p class="panel__foot">Upload and assessment-run history is in the audit trail, visible to auditors and administrators.</p>`,
+			);
+		}
+
+		// Score trajectory band: stored assessment history of the five highest-risk customers.
+		const trendEl = $('#ov-trend');
+		const ids = summary.top_risky_customers.map((c) => c.customer_id);
+		if (!ids.length) mount(trendEl, emptyState('No assessment history yet', 'Trajectories appear once customers have been assessed.'));
+		else {
+			mount(trendEl, html`<div class="sparks">${ids.map(() => html`<div class="spark">${skeleton(4)}</div>`)}</div>`);
+			const results = await Promise.allSettled(ids.map((id) => customer(id)));
+			if (signal.aborted) return;
+			trendDetails = results.flatMap((r) => (r.status === 'fulfilled' && r.value.assessments.length ? [r.value] : []));
+			const latest = Math.max(0, ...trendDetails.flatMap((d) => d.assessments.map((a) => a.assessed_at)));
+			mount($('#ov-trend-meta'), latest ? `Stored assessments for each customer. Most recent: ${epochDateTime(latest)} (${relative(latest)})` : 'Stored assessments for each customer');
+			const pressed = $<HTMLButtonElement>('#ov-period [aria-pressed="true"]');
+			drawTrend(trendDetails, Number(pressed?.dataset.days ?? 0));
+		}
+
+	}
+
+	function drawTrend(details: CustomerDetail[], days: number) {
+		const trendEl = $('#ov-trend');
+		if (!trendEl || !details.length) return;
+		const since = days ? Date.now() / 1000 - days * 86400 : 0;
+		mount(trendEl, html`<div class="sparks">${details.map((d) => trendCell(d, since))}</div>`);
+		for (const d of details) {
+			const el = trendEl.querySelector<HTMLElement>(`[data-spark="${CSS.escape(d.customer.customer_id)}"]`);
+			if (!el) continue;
+			const points = d.assessments
+				.filter((a) => a.assessed_at >= since)
+				.map((a) => ({ x: a.assessed_at, y: a.warning_score, tip: `${score(a.warning_score)}, ${a.risk_category}\n${epochDateTime(a.assessed_at)}` }));
+			if (!points.length) {
+				mount(el, html`<p class="spark__empty">No assessment in this period</p>`);
+				continue;
+			}
+			responsive(el, (w) =>
+				line(points, w, {
+					height: 96,
+					yDomain: [0, 100],
+					xFormat: epochShort,
+					yFormat: (v) => String(v),
+					label: `Warning score history for ${d.customer.customer_id}`,
+					dark: true,
+					compact: true,
+					area: true,
+				}),
+			);
+		}
+		trendEl.insertAdjacentHTML(
+			'beforeend',
+			String(
+				tableView(
+					'Warning score history',
+					['Customer', 'Assessed', 'Score', 'Category'],
+					details.flatMap((d) =>
+						d.assessments.filter((a) => a.assessed_at >= since).map((a) => [d.customer.customer_id, epochDateTime(a.assessed_at), score(a.warning_score), a.risk_category]),
+					),
+				),
+			),
+		);
+	}
+
+	function concentration(intel: PortfolioIntelligence): Html {
+		const groups = intel.products;
+		const shown = groups.filter((g) => !g.suppressed);
+		const suppressed = groups.filter((g) => g.suppressed);
+		if (!groups.length) return emptyState('No product data');
+		return html`${shown.length
+			? hbars(
+					shown
+						.sort((a, b) => (b.deteriorating_share ?? 0) - (a.deteriorating_share ?? 0))
+						.map((g) => ({
+							label: g.group === 'none' ? 'No facility' : humanize(g.group),
+							value: g.deteriorating_share ?? 0,
+							display: pct(g.deteriorating_share ?? 0),
+							tip: `${g.group}\n${count(g.deteriorating ?? 0)} of ${count(g.customers ?? 0)} customers deteriorating\nExposure ${moneyCompact(g.exposure ?? 0)}`,
+							cls: g.cluster ? 'fill-risk-high' : 'fill-accent',
+							href: g.group === 'none' ? undefined : `/watchlist?product_type=${encodeURIComponent(g.group)}`,
+						})),
+					{ max: 1, reference: { value: intel.portfolio_deteriorating_share, label: `Portfolio average ${pct(intel.portfolio_deteriorating_share)}` }, label: 'Deteriorating share by product' },
+				)
+			: emptyState('All product groups are suppressed', `Groups with fewer than ${intel.suppressed_below} customers are hidden to protect individual customers.`)}
+			${suppressed.length ? html`<p class="note">${suppressed.length} product group${suppressed.length === 1 ? '' : 's'} with fewer than ${intel.suppressed_below} customers suppressed.</p>` : ''}
+			<p class="note">Shares describe co-occurrence within a group; they do not establish cause.</p>`;
+	}
+
+	function confirmRun(ctx: PageContext) {
+		const customers = lastTotal;
+		openDialog({
+			title: 'Run a warning assessment',
+			description: html`Scores every customer in your data scope with the active policy and the deterministic rules. Each run adds new assessment records; earlier assessments and analyst decisions are kept.`,
+			fields: [],
+			submit: `Assess ${count(customers)} customers`,
+			confirm: () => summaryList([['Customers in scope', count(customers)], ['Engine', 'Deterministic EWS scoring']], 'The request runs synchronously and may take a few seconds for a large portfolio.'),
+			onSubmit: async () => {
+				const button = $<HTMLButtonElement>('#ov-run');
+				const started = Date.now();
+				if (button) {
+					button.disabled = true;
+					button.textContent = 'Assessing…';
+				}
+				const timer = window.setInterval(() => {
+					if (button) button.textContent = `Assessing… ${Math.round((Date.now() - started) / 1000)} s`;
+				}, 1000);
+				try {
+					const result = await runAssessment();
+					toast(`Assessed ${count(result.total_assessed)} customers with scoring version ${result.scoring_version}.`);
+					await render(ctx);
+				} catch (error) {
+					toast(`Assessment failed: ${failureMessage(error)}`, 'critical');
+					throw error;
+				} finally {
+					window.clearInterval(timer);
+					if (button && !ctx.signal.aborted) {
+						button.disabled = false;
+						button.textContent = 'Run assessment';
+					}
+				}
+			},
+		});
+	}
+</script>

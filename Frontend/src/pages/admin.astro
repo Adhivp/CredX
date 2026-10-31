@@ -1,0 +1,191 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Administration" page="admin">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Administration</h1>
+			<p class="page-head__lede">Roles, data scopes, institutional policy and the audit trail. Administrators govern access and configuration; they make no credit decisions.</p>
+		</div>
+	</header>
+	<div class="tabs" role="tablist" aria-label="Administration" id="ad-tabs"></div>
+	<div id="ad-root"></div>
+</AppShell>
+
+<script>
+	import { assignRole, auditLogs, grantScope, policies, revokeScope, users } from '../lib/api/governance';
+	import { isAbort } from '../lib/api/client';
+	import { epochDateTime, humanize, money, shortId } from '../lib/format';
+	import { html, mount, raw, type Html } from '../lib/html';
+	import { $, $$, definePage, setParams, type PageContext } from '../lib/page';
+	import { ROLES, can, roleLabel } from '../lib/permissions';
+	import type { AdminUser, AuditEntry, PolicyVersion } from '../lib/types';
+	import { emptyState, errorState, openDialog, pill, skeleton, summary, toast } from '../lib/ui';
+
+	type Tab = 'users' | 'audit' | 'policies';
+	let people: AdminUser[] = [];
+	const nameOf = (id: string | null) => (id ? people.find((u) => u.id === id)?.full_name ?? shortId(id) : 'System');
+
+	function scopeLabel(s: { scope_type: string; scope_value: string }) {
+		if (s.scope_type === 'all') return 'All customers';
+		return `${s.scope_type === 'segment' ? 'Segment' : 'Customer'} ${s.scope_value}`;
+	}
+
+	function usersView(list: AdminUser[], ctx: PageContext): Html {
+		if (!list.length) return emptyState('No users');
+		return html`<div class="panel panel--flush"><div class="table-wrap"><table class="table">
+			<thead><tr><th>User</th><th>Role</th><th class="num">Approval limit</th><th>Data scope</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+			<tbody>${list.map((u) => {
+				const self = u.id === ctx.user.id;
+				return html`<tr><td><span class="row__title">${u.full_name}${self ? ' (you)' : ''}</span><div class="row__sub">${u.email}</div></td>
+					<td>${u.role === 'unassigned' ? pill('No role', 'warning') : roleLabel(u.role)}</td>
+					<td class="num">${u.approval_limit === null ? '—' : money(u.approval_limit)}</td>
+					<td><span class="ad-scopes">${u.scopes.length
+						? u.scopes.map((s) => html`<span class="ad-scope">${scopeLabel(s)}<button type="button" class="ad-scope__x" data-revoke="${u.id}" data-type="${s.scope_type}" data-value="${s.scope_value}" aria-label="Revoke ${scopeLabel(s)}">×</button></span>`)
+						: ['risk_admin', 'auditor'].includes(u.role) ? html`<span class="muted">All (by role)</span>` : html`<span class="muted">None: sees no customers</span>`}</span></td>
+					<td>${u.is_active ? pill('Active', 'good') : pill('Inactive', 'neutral')}</td>
+					<td><span class="btn-row"><button type="button" class="btn btn--secondary btn--sm" data-role="${u.id}" ${self ? raw('disabled title="Administrators cannot change their own role"') : ''}>Change role</button>
+						<button type="button" class="btn btn--ghost btn--sm" data-grant="${u.id}">Grant scope</button></span></td></tr>`;
+			})}</tbody></table></div></div>
+			<p class="note ad-note">Self-registered accounts start with no role. Assign a role and a data scope before the person can see portfolio data.</p>`;
+	}
+
+	function auditView(list: AuditEntry[]): Html {
+		if (!list.length) return emptyState('No audit entries match');
+		return html`<div class="panel panel--flush"><div class="table-wrap"><table class="table table--compact">
+			<thead><tr><th>Time</th><th>Action</th><th>Outcome</th><th>User</th><th>Resource</th><th>Detail</th></tr></thead>
+			<tbody>${list.map(
+				(e) => html`<tr><td class="nowrap">${epochDateTime(e.created_at)}</td><td>${humanize(e.action)}</td>
+					<td>${pill(humanize(e.outcome), e.outcome === 'allowed' ? 'good' : e.outcome === 'denied' ? 'critical' : 'warning')}</td>
+					<td>${nameOf(e.user_id)}${e.role ? html`<div class="row__sub">${roleLabel(e.role)}</div>` : ''}</td>
+					<td>${humanize(e.resource_type)}<div class="row__sub tnum">${e.resource_id ? shortId(e.resource_id) : ''}</div></td>
+					<td class="ad-detail">${Object.keys(e.detail ?? {}).length ? JSON.stringify(e.detail) : ''}</td></tr>`,
+			)}</tbody></table></div></div>`;
+	}
+
+	function policiesView(list: PolicyVersion[]): Html {
+		if (!list.length) return emptyState('No policy versions');
+		return html`<div class="ad-policies">${list.map(
+			(p) => html`<section class="panel"><div class="panel__head"><h2 class="panel__title">Version ${p.version}</h2>${p.is_active ? pill('Active', 'good') : pill('Superseded', 'neutral')}</div>
+				<p class="note">Published ${epochDateTime(p.created_at)} by ${nameOf(p.created_by)}${p.change_reason ? `: ${p.change_reason}` : ''}</p>
+				<details class="disclosure ad-config"><summary>Configuration</summary><pre class="code">${JSON.stringify(p.config, null, 2)}</pre></details></section>`,
+		)}</div><p class="note">Policies are read-only here. A new version is published through the API by a risk administrator; earlier versions remain for audit.</p>`;
+	}
+
+	async function show(tab: Tab, ctx: PageContext) {
+		setParams({ tab });
+		$$('#ad-tabs [data-tab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === tab)));
+		const root = $('#ad-root')!;
+		mount(root, html`<div class="panel">${skeleton(6)}</div>`);
+		try {
+			if (tab === 'users') {
+				people = (await users()).items;
+				if (!ctx.signal.aborted) mount(root, usersView(people, ctx));
+			} else if (tab === 'audit') {
+				if (can(ctx.user.role, 'manage_users') && !people.length) people = (await users().catch(() => ({ items: [] as AdminUser[] }))).items;
+				const p = new URLSearchParams(location.search);
+				const outcome = p.get('outcome') ?? '';
+				const resource = p.get('resource') ?? '';
+				const list = (await auditLogs({ outcome: outcome || undefined, resource_id: resource || undefined, limit: 200 })).items;
+				if (ctx.signal.aborted) return;
+				mount(
+					root,
+					html`<form class="filters ad-filters" id="ad-audit-filter">
+						<div class="field"><label class="field__label" for="ad-outcome">Outcome</label><select class="input" id="ad-outcome" name="outcome">
+							${['', 'allowed', 'denied', 'blocked'].map((o) => html`<option value="${o}" ${o === outcome ? 'selected' : ''}>${o ? humanize(o) : 'All outcomes'}</option>`)}</select></div>
+						<div class="field"><label class="field__label" for="ad-resource">Resource ID</label><input class="input" id="ad-resource" name="resource" value="${resource}" maxlength="64" placeholder="Exact ID" /></div>
+						<button type="submit" class="btn btn--primary btn--sm">Filter</button></form>
+						<p class="note ad-note">Latest ${list.length} entries${list.length >= 200 ? ' (limit 200)' : ''}.</p>${auditView(list)}`,
+				);
+			} else {
+				if (can(ctx.user.role, 'manage_users') && !people.length) people = (await users().catch(() => ({ items: [] as AdminUser[] }))).items;
+				const list = (await policies()).items;
+				if (!ctx.signal.aborted) mount(root, policiesView(list));
+			}
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			mount(root, html`<div class="panel">${errorState(error)}</div>`);
+			$('[data-retry]', root)?.addEventListener('click', () => void show(tab, ctx), { once: true });
+		}
+	}
+
+	definePage('admin', async (ctx) => {
+		people = [];
+		const tabs: [Tab, string][] = [];
+		if (can(ctx.user.role, 'manage_users')) tabs.push(['users', 'Users and access']);
+		if (can(ctx.user.role, 'view_audit')) tabs.push(['audit', 'Audit trail'], ['policies', 'Policy versions']);
+		mount($('#ad-tabs'), html`${tabs.map(([t, l]) => html`<button type="button" class="tab" role="tab" data-tab="${t}" aria-selected="false">${l}</button>`)}`);
+		const wanted = ctx.params.get('tab') as Tab | null;
+		const first = tabs.find(([t]) => t === wanted)?.[0] ?? tabs[0]?.[0];
+		$('#ad-tabs')?.addEventListener('click', (e) => {
+			const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]')?.dataset.tab as Tab | undefined;
+			if (t) void show(t, ctx);
+		});
+
+		const root = $('#ad-root')!;
+		root.addEventListener('submit', (e) => {
+			const form = e.target as HTMLFormElement;
+			if (form.id !== 'ad-audit-filter') return;
+			e.preventDefault();
+			const d = new FormData(form);
+			setParams({ outcome: String(d.get('outcome') ?? '') || null, resource: String(d.get('resource') ?? '').trim() || null });
+			void show('audit', ctx);
+		});
+		root.addEventListener('click', (e) => {
+			const t = e.target as HTMLElement;
+			const roleId = t.closest<HTMLElement>('[data-role]')?.dataset.role;
+			const grantId = t.closest<HTMLElement>('[data-grant]')?.dataset.grant;
+			const revoke = t.closest<HTMLElement>('[data-revoke]');
+			const user = people.find((u) => u.id === (roleId ?? grantId ?? revoke?.dataset.revoke));
+			if (!user) return;
+			if (roleId) {
+				openDialog({
+					title: `Change role: ${user.full_name}`,
+					fields: [
+						{ name: 'role', label: 'Role', type: 'select', value: user.role, options: ROLES.map((r) => ({ value: r, text: roleLabel(r) })) },
+						{ name: 'approval_limit', label: 'Approval limit, INR (credit managers only)', type: 'number', min: 0, value: user.approval_limit === null ? '' : String(user.approval_limit), hint: 'Maximum exposure at risk this manager may approve.' },
+						{ name: 'reason', label: 'Reason', type: 'textarea', required: true, minLength: 5, maxLength: 2000 },
+					],
+					submit: 'Change role',
+					confirm: (v) => summary([['User', `${user.full_name} (${user.email})`], ['From', roleLabel(user.role)], ['To', roleLabel(v.role)], ['Approval limit', v.role === 'credit_manager' && v.approval_limit ? money(Number(v.approval_limit)) : 'None'], ['Reason', v.reason]], 'Role changes take effect on the user’s next request and are written to the audit trail.'),
+					onSubmit: async (v) => {
+						await assignRole(user.id, { role: v.role, approval_limit: v.role === 'credit_manager' && v.approval_limit !== '' ? Number(v.approval_limit) : null, reason: v.reason });
+						toast(`${user.full_name} is now ${roleLabel(v.role).toLowerCase()}.`);
+						await show('users', ctx);
+					},
+				});
+			} else if (grantId) {
+				openDialog({
+					title: `Grant data scope: ${user.full_name}`,
+					fields: [
+						{ name: 'scope_type', label: 'Scope', type: 'select', options: [{ value: 'segment', text: 'A portfolio segment' }, { value: 'customer', text: 'One customer' }, { value: 'all', text: 'All customers' }] },
+						{ name: 'scope_value', label: 'Segment or customer ID (exact)', maxLength: 64, hint: 'Leave empty for all customers.' },
+						{ name: 'reason', label: 'Reason', type: 'textarea', required: true, minLength: 5, maxLength: 2000 },
+					],
+					submit: 'Grant scope',
+					onSubmit: async (v) => {
+						await grantScope(user.id, { scope_type: v.scope_type, scope_value: v.scope_type === 'all' ? '' : v.scope_value, reason: v.reason });
+						toast('Scope granted.');
+						await show('users', ctx);
+					},
+				});
+			} else if (revoke) {
+				const scope = { scope_type: revoke.dataset.type!, scope_value: revoke.dataset.value ?? '' };
+				openDialog({
+					title: `Revoke ${scopeLabel(scope)}`,
+					description: `${user.full_name} will no longer see customers covered by this scope.`,
+					fields: [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, minLength: 5, maxLength: 2000 }],
+					submit: 'Revoke scope',
+					danger: true,
+					onSubmit: async (v) => {
+						await revokeScope(user.id, { ...scope, reason: v.reason });
+						toast('Scope revoked.');
+						await show('users', ctx);
+					},
+				});
+			}
+		});
+		if (first) await show(first, ctx);
+	});
+</script>

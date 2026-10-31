@@ -1,0 +1,16 @@
+---
+interface Props {
+	size?: number;
+	inverse?: boolean;
+}
+const { size = 28, inverse = false } = Astro.props;
+const bg = inverse ? '#ffffff' : '#000000';
+const fg = inverse ? '#000000' : '#ffffff';
+---
+
+<!-- Two crossing strokes; the second is broken, read as a signal being monitored. -->
+<svg class="brand__mark" width={size} height={size} viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+	<rect width="28" height="28" rx="8" fill={bg}></rect>
+	<path d="M8.5 8.5 19.5 19.5" stroke={fg} stroke-width="3" stroke-linecap="round"></path>
+	<path d="M19.5 8.5 8.5 19.5" stroke={fg} stroke-width="3" stroke-linecap="round" stroke-dasharray="3.4 3.4"></path>
+</svg>

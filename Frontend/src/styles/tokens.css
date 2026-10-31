@@ -1,91 +1,132 @@
-/* ==========================================================================
-   CredX Design System Tokens — Luxury Black, Gold & White Bank Palette
-   ========================================================================== */
-
+/*
+ * CredX design tokens.
+ * Black is structure (navigation, the chart band, primary actions). Colour is reserved
+ * for risk and state. The four risk hues were checked with the data-viz palette
+ * validator against the white surface (CVD and normal-vision separation pass); medium
+ * sits below 3:1 contrast, so risk is always shown with a text label and a level glyph.
+ */
 :root {
-	/* Brand Gold Spectrum (Primary Accent & Highlights) */
-	--gold-50: #FFFDF5;
-	--gold-100: #FFF9E6;
-	--gold-200: #FFF0BF;
-	--gold-300: #FFE699;
-	--gold-400: #FFD966;
-	--gold-500: #F5C518;  /* Core Gold */
-	--gold-600: #D4A912;
-	--gold-700: #B08D0E;
-	--gold-800: #8C700A;
-	--gold-900: #695307;
+	color-scheme: light;
 
-	/* Gold Gradient Presets */
-	--gold-gradient: linear-gradient(135deg, #FFF0BF 0%, #F5C518 50%, #D4A912 100%);
-	--gold-gradient-hover: linear-gradient(135deg, #FFFFFF 0%, #FFD966 60%, #F5C518 100%);
-	--gold-gradient-card: linear-gradient(135deg, rgba(245, 197, 24, 0.18) 0%, rgba(212, 169, 18, 0.04) 100%);
-	--gold-border-gradient: linear-gradient(90deg, transparent, rgba(245, 197, 24, 0.4), transparent);
+	/* Planes */
+	--canvas: #dddcd7; /* behind the application frame */
+	--stone: #edece8; /* application background */
+	--stone-2: #e4e3de; /* pressed / inset on stone */
+	--paper: #ffffff; /* panels */
+	--paper-2: #f7f6f3; /* inset within panels, table heads */
+	--ink: #000000; /* structure */
+	--ink-2: #1d1d1f; /* raised surfaces on the black band */
+	--ink-3: #2c2c2e;
 
-	/* Deep Obsidian & Charcoal Scale (Backgrounds & Surfaces) */
-	--black-950: #050505;  /* Canvas Background */
-	--black-900: #0A0A0A;  /* Primary Card Surface */
-	--black-850: #0F0F0F;  /* Secondary Surface */
-	--black-800: #141414;  /* Tertiary / Floating Panes */
-	--black-750: #1A1A1A;  /* Input Base */
-	--black-700: #222222;  /* Input Hover / Focus */
-	--black-600: #2E2E2E;
+	/* Text */
+	--text: #18181b;
+	--text-2: #4f4d48;
+	--text-3: #706d66; /* ≥4.5:1 on paper and stone */
+	--text-on-ink: #f4f3ef;
+	--text-on-ink-2: #b9b7af;
 
-	/* Monochrome Alpha Hierarchy */
-	--white: #FFFFFF;
-	--white-90: rgba(255, 255, 255, 0.90);
-	--white-75: rgba(255, 255, 255, 0.75);
-	--white-60: rgba(255, 255, 255, 0.60);
-	--white-40: rgba(255, 255, 255, 0.40);
-	--white-20: rgba(255, 255, 255, 0.20);
-	--white-10: rgba(255, 255, 255, 0.10);
-	--white-05: rgba(255, 255, 255, 0.05);
-	--white-03: rgba(255, 255, 255, 0.03);
+	/* Lines */
+	--line: rgba(0, 0, 0, 0.08);
+	--line-2: rgba(0, 0, 0, 0.14);
+	--line-on-ink: rgba(255, 255, 255, 0.12);
 
-	/* Semantic Colors */
-	--bg-canvas: var(--black-950);
-	--bg-surface: var(--black-900);
-	--bg-surface-elevated: var(--black-850);
-	--bg-input: var(--black-750);
-	--bg-input-active: var(--black-700);
+	/* Accent */
+	--accent: #2350d2;
+	--accent-strong: #1a3fae;
+	--accent-wash: #e8eefc;
+	--accent-on-ink: #5fc4e8; /* single series on the black band */
 
-	--text-primary: var(--white);
-	--text-secondary: var(--white-75);
-	--text-muted: var(--white-40);
-	--text-accent: var(--gold-500);
+	/* Risk — validated set (light surface) */
+	--risk-low: #0e8c7b;
+	--risk-medium: #dda916;
+	--risk-high: #e25c2c;
+	--risk-critical: #9c1a34;
+	--risk-insufficient: #a19e96;
+	--risk-low-wash: #e2f2ef;
+	--risk-medium-wash: #fbf2d8;
+	--risk-high-wash: #fce8df;
+	--risk-critical-wash: #f5e1e6;
+	--risk-insufficient-wash: #efeeea;
+	--risk-low-ink: #08594f;
+	--risk-medium-ink: #6e5100;
+	--risk-high-ink: #983612;
+	--risk-critical-ink: #85142c;
+	--risk-insufficient-ink: #55524c;
 
-	--border-subtle: var(--white-05);
-	--border-medium: var(--white-10);
-	--border-strong: var(--white-20);
-	--border-accent: rgba(245, 197, 24, 0.35);
+	/* State tones (map onto the same ramps; info is the accent) */
+	--tone-good: var(--risk-low);
+	--tone-good-wash: var(--risk-low-wash);
+	--tone-good-ink: var(--risk-low-ink);
+	--tone-warning: var(--risk-medium);
+	--tone-warning-wash: var(--risk-medium-wash);
+	--tone-warning-ink: var(--risk-medium-ink);
+	--tone-serious: var(--risk-high);
+	--tone-serious-wash: var(--risk-high-wash);
+	--tone-serious-ink: var(--risk-high-ink);
+	--tone-critical: var(--risk-critical);
+	--tone-critical-wash: var(--risk-critical-wash);
+	--tone-critical-ink: var(--risk-critical-ink);
+	--tone-info: var(--accent);
+	--tone-info-wash: var(--accent-wash);
+	--tone-info-ink: var(--accent-strong);
+	--tone-neutral: var(--risk-insufficient);
+	--tone-neutral-wash: var(--risk-insufficient-wash);
+	--tone-neutral-ink: var(--risk-insufficient-ink);
+	--success: var(--risk-low);
+	--warning: var(--risk-medium);
+	--error: #b4232f;
 
-	--status-success: #22C55E;
-	--status-warning: #F59E0B;
-	--status-danger: #EF4444;
-	--status-info: #3B82F6;
+	/* Type */
+	--font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--fs-display: clamp(2.25rem, 1.6rem + 2.2vw, 3.25rem);
+	--fs-h1: clamp(1.75rem, 1.4rem + 1.2vw, 2.375rem);
+	--fs-h2: 1.25rem;
+	--fs-h3: 1.0625rem;
+	--fs-body: 0.9375rem;
+	--fs-sm: 0.8125rem;
+	--fs-xs: 0.75rem;
+	--fs-figure: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
+	--lh-tight: 1.1;
+	--lh-body: 1.5;
 
-	/* Typography */
-	--font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	--font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	--font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+	/* Space (4px base) */
+	--s-1: 4px;
+	--s-2: 8px;
+	--s-3: 12px;
+	--s-4: 16px;
+	--s-5: 20px;
+	--s-6: 24px;
+	--s-8: 32px;
+	--s-10: 40px;
+	--s-12: 48px;
+	--s-16: 64px;
+	--gutter: clamp(16px, 2.6vw, 36px);
+	--content-max: 1440px;
 
-	/* Border Radii */
-	--radius-xs: 0.25rem;
-	--radius-sm: 0.5rem;
-	--radius-md: 0.75rem;
-	--radius-lg: 1rem;
-	--radius-xl: 1.5rem;
-	--radius-2xl: 2rem;
-	--radius-full: 9999px;
+	/* Radius — frame > panel > control > pill */
+	--r-frame: 28px;
+	--r-panel: 20px;
+	--r-control: 12px;
+	--r-sm: 8px;
+	--r-pill: 999px;
 
-	/* Luxury Box Shadows */
-	--shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.5);
-	--shadow-card: 0 16px 40px rgba(0, 0, 0, 0.6);
-	--shadow-float: 0 24px 60px rgba(0, 0, 0, 0.75);
-	--shadow-gold: 0 4px 24px rgba(245, 197, 24, 0.22);
-	--shadow-gold-lg: 0 10px 40px rgba(245, 197, 24, 0.35);
+	/* Elevation: hairlines first; shadow only for floating layers */
+	--shadow-float: 0 12px 32px -12px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.06);
 
-	/* Transitions */
-	--ease-fast: 160ms cubic-bezier(0.16, 1, 0.3, 1);
-	--ease-base: 260ms cubic-bezier(0.16, 1, 0.3, 1);
-	--ease-slow: 450ms cubic-bezier(0.16, 1, 0.3, 1);
+	/* Motion */
+	--ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+	--dur-1: 120ms;
+	--dur-2: 200ms;
+	--dur-3: 320ms;
+
+	/* Header */
+	--header-h: 72px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--dur-1: 0ms;
+		--dur-2: 0ms;
+		--dur-3: 0ms;
+	}
 }

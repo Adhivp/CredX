@@ -1,0 +1,337 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Data and assessment" page="data">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Data and assessment</h1>
+			<p class="page-head__lede">
+				Load portfolio records through the early-warning upload service, then score every customer in your data scope.
+				Files are parsed and validated by the API; nothing is accepted until it responds.
+			</p>
+		</div>
+	</header>
+
+	<div class="data-layout">
+		<section class="panel" id="upload-panel" aria-labelledby="upload-title" hidden>
+			<div class="panel__head"><h2 class="panel__title" id="upload-title">Upload records</h2><span class="panel__meta">CSV, Excel or JSON, up to 10 MB</span></div>
+
+			<form id="upload-form" novalidate>
+				<fieldset class="step">
+					<legend class="step__title"><span class="step__n">1</span>Choose what the file contains</legend>
+					<div class="types" id="upload-types"></div>
+				</fieldset>
+
+				<fieldset class="step">
+					<legend class="step__title"><span class="step__n">2</span>Choose the file</legend>
+					<label class="drop" id="drop">
+						<input type="file" id="upload-file" name="file" accept=".csv,.xlsx,.xls,.json" class="sr-only" />
+						<span class="drop__text"><strong>Select a file</strong> or drop it here</span>
+						<span class="drop__hint">.csv, .xlsx, .xls or .json</span>
+					</label>
+					<div id="file-meta"></div>
+				</fieldset>
+
+				<fieldset class="step">
+					<legend class="step__title"><span class="step__n">3</span>Upload and review the result</legend>
+					<button type="submit" class="btn btn--primary" id="upload-submit" disabled>Upload</button>
+					<div id="upload-result" aria-live="polite"></div>
+				</fieldset>
+			</form>
+		</section>
+
+		<div class="data-side">
+			<section class="panel" id="assess-panel" aria-labelledby="assess-title" hidden>
+				<div class="panel__head"><h2 class="panel__title" id="assess-title">Run assessment</h2><span class="panel__meta" id="assess-scope"></span></div>
+				<p class="secondary data-copy">
+					Scores every customer in your data scope with the active institutional policy and the deterministic rules. Each run
+					adds new assessment records; earlier assessments and analyst decisions are kept.
+				</p>
+				<button type="button" class="btn btn--primary" id="assess-run">Run assessment</button>
+				<div id="assess-result" aria-live="polite"></div>
+			</section>
+
+			<section class="panel" aria-labelledby="log-title">
+				<div class="panel__head"><h2 class="panel__title" id="log-title">Uploads in this session</h2></div>
+				<div id="upload-log"></div>
+				<p class="panel__foot">
+					The API records every upload but does not expose an upload history endpoint, so this list shows only responses received
+					in this browser session.
+				</p>
+			</section>
+		</div>
+	</div>
+</AppShell>
+
+<script>
+	import { portfolioSummary, runAssessment, upload } from '../lib/api/ews';
+	import { bytes, count, epochDateTime, humanize, score } from '../lib/format';
+	import { html, mount, type Html } from '../lib/html';
+	import { $, $$, definePage } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import { RISK_CATEGORIES, UPLOAD_TYPES, type AssessmentRunResult, type UploadResult, type UploadType } from '../lib/types';
+	import { emptyState, errorState, failureMessage, pill, riskBadge, toast } from '../lib/ui';
+
+	const MAX_BYTES = 10 * 1024 * 1024;
+	const EXTENSIONS = ['.csv', '.xlsx', '.xls', '.json'];
+	const LOG_KEY = 'credx.upload-log';
+
+	/** From backend/app/services/ingestion.py: REQUIRED_COLUMNS and the per-type row handlers. */
+	const TYPES: Record<UploadType, { label: string; required: string[]; optional: string[]; note: string }> = {
+		customers: {
+			label: 'Customers',
+			required: ['customer_id', 'customer_type'],
+			optional: ['employment_category', 'portfolio_segment'],
+			note: 'Upload first. Re-uploading a customer updates its type, employment and segment.',
+		},
+		loans: {
+			label: 'Loan facilities',
+			required: ['customer_id', 'loan_id', 'product_type', 'sanctioned_amount', 'outstanding_balance'],
+			optional: ['tenure_months', 'instalment_amount', 'disbursement_date', 'status'],
+			note: 'Customers must exist. A loan_id that already exists is skipped.',
+		},
+		repayments: {
+			label: 'Repayments',
+			required: ['customer_id', 'loan_id', 'due_date', 'amount_due', 'amount_paid', 'repayment_status'],
+			optional: ['payment_date', 'dpd'],
+			note: 'The loan must exist for that customer. Rows are appended, so uploading a file twice adds duplicates.',
+		},
+		exposure: {
+			label: 'Exposure snapshots',
+			required: ['customer_id', 'facility_type', 'outstanding_balance'],
+			optional: ['facility_id', 'sanctioned_amount', 'credit_limit', 'current_utilisation', 'instalment_amount', 'disbursement_date', 'snapshot_date'],
+			note: 'Rows are appended. New data re-evaluates monitored investigations for these customers.',
+		},
+		cashflow: {
+			label: 'Cash flow',
+			required: ['customer_id', 'month', 'monthly_inflow'],
+			optional: ['monthly_outflow', 'record_date'],
+			note: 'Rows are appended. New data re-evaluates monitored investigations for these customers.',
+		},
+	};
+
+	interface LogEntry extends UploadResult {
+		data_type: UploadType;
+		at: number;
+	}
+
+	const readLog = (): LogEntry[] => {
+		try {
+			return JSON.parse(sessionStorage.getItem(LOG_KEY) ?? '[]');
+		} catch {
+			return [];
+		}
+	};
+
+	function renderLog() {
+		const log = readLog();
+		mount(
+			$('#upload-log'),
+			log.length
+				? html`<ul class="list">${log.map(
+						(e) => html`<li class="row"><span class="row__main"><span class="row__title">${e.filename}</span>
+							<span class="row__sub">${TYPES[e.data_type]?.label ?? e.data_type}, ${count(e.records_loaded)} loaded${e.errors.length ? `, ${count(e.errors.length)} messages` : ''}, ${epochDateTime(e.at)}</span></span>
+							${statusOf(e.status)}</li>`,
+					)}</ul>`
+				: emptyState('No uploads yet in this session'),
+		);
+	}
+
+	function statusOf(status: UploadResult['status']): Html {
+		if (status === 'success') return pill('Loaded', 'good');
+		if (status === 'partial') return pill('Partially loaded', 'warning');
+		return pill('Rejected', 'critical');
+	}
+
+	function resultView(r: UploadResult, type: UploadType): Html {
+		const skipped = r.status === 'partial' ? r.errors.length : 0;
+		const title =
+			r.status === 'success'
+				? `${count(r.records_loaded)} ${TYPES[type].label.toLowerCase()} records loaded`
+				: r.status === 'partial'
+					? `${count(r.records_loaded)} loaded, ${count(skipped)} rows skipped`
+					: 'File rejected; no records were loaded';
+		const capped = r.errors.length >= 200;
+		return html`<div class="result result--${r.status}">
+			<div class="row"><span class="result__title">${title}</span>${statusOf(r.status)}</div>
+			<dl class="facts result__facts">
+				<div><dt>File</dt><dd>${r.filename}</dd></div>
+				<div><dt>Records loaded</dt><dd class="tnum">${count(r.records_loaded)}</dd></div>
+				<div><dt>Messages</dt><dd class="tnum">${count(r.errors.length)}${capped ? ' (first 200)' : ''}</dd></div>
+				<div><dt>Upload reference</dt><dd class="tnum">${r.upload_id.slice(0, 8)}</dd></div>
+			</dl>
+			${r.errors.length
+				? html`<details class="disclosure result__errors" ${r.status === 'error' ? 'open' : ''}><summary>${r.status === 'error' ? 'Why it was rejected' : 'Skipped rows'}</summary>
+					<ul class="result__list">${r.errors.map((e) => html`<li>${e}</li>`)}</ul></details>`
+				: ''}
+			${r.status !== 'error' && (type === 'customers' || type === 'loans')
+				? html`<p class="note">Next: upload ${type === 'customers' ? 'loan facilities' : 'repayments'} for these customers, then run an assessment.</p>`
+				: ''}
+		</div>`;
+	}
+
+	function assessmentView(r: AssessmentRunResult, elapsed: number): Html {
+		const byCategory = Object.fromEntries(RISK_CATEGORIES.map((c) => [c, 0])) as Record<string, number>;
+		for (const a of r.assessments) byCategory[a.risk_category] = (byCategory[a.risk_category] ?? 0) + 1;
+		const top = [...r.assessments].sort((a, b) => b.warning_score - a.warning_score).slice(0, 8);
+		return html`<div class="result result--success">
+			<div class="row"><span class="result__title">Assessed ${count(r.total_assessed)} customers</span>${pill('Completed', 'good')}</div>
+			<p class="note">Scoring version ${r.scoring_version}. The API responded after ${(elapsed / 1000).toFixed(1)} s.</p>
+			<ul class="result__cats">${RISK_CATEGORIES.map((c) => html`<li>${riskBadge(c, 'sm')}<span class="tnum">${count(byCategory[c])}</span></li>`)}</ul>
+			<div class="table-wrap"><table class="table table--compact"><thead><tr><th>Customer</th><th class="num">Score</th><th>Category</th><th>Classification</th></tr></thead>
+			<tbody>${top.map(
+				(a) => html`<tr><td><a class="row-link" href="/customer?id=${encodeURIComponent(a.customer_id)}">${a.customer_id}</a></td><td class="num">${score(a.warning_score)}</td><td>${riskBadge(a.risk_category, 'sm')}</td><td class="secondary">${humanize(a.classification)}</td></tr>`,
+			)}</tbody></table></div>
+			<a class="btn btn--secondary btn--sm" href="/watchlist">Open the watchlist</a>
+		</div>`;
+	}
+
+	definePage('data', async ({ user, signal }) => {
+		const canUpload = can(user.role, 'upload_data');
+		const canAssess = can(user.role, 'run_assessment');
+		$('#upload-panel')!.hidden = !canUpload;
+		$('#assess-panel')!.hidden = !canAssess;
+		renderLog();
+
+		const showScope = () =>
+			void portfolioSummary()
+				.then((s) => {
+					if (!signal.aborted) mount($('#assess-scope'), `${count(s.total_customers)} customers in scope`);
+				})
+				.catch(() => {});
+		if (canAssess) {
+			showScope();
+			$('#assess-run')?.addEventListener('click', async (event) => {
+				const button = event.currentTarget as HTMLButtonElement;
+				const out = $('#assess-result');
+				const started = Date.now();
+				button.disabled = true;
+				const tick = () => (button.textContent = `Assessing… ${Math.round((Date.now() - started) / 1000)} s`);
+				tick();
+				const timer = window.setInterval(tick, 1000);
+				mount(out, '');
+				try {
+					const result = await runAssessment();
+					if (signal.aborted) return;
+					mount(out, assessmentView(result, Date.now() - started));
+					toast(`Assessed ${count(result.total_assessed)} customers.`);
+				} catch (error) {
+					if (signal.aborted) return;
+					mount(out, errorState(error, false));
+					toast(`Assessment failed: ${failureMessage(error)}`, 'critical');
+				} finally {
+					window.clearInterval(timer);
+					button.disabled = false;
+					button.textContent = 'Run assessment';
+				}
+			});
+		}
+
+		if (!canUpload) return;
+
+		mount(
+			$('#upload-types'),
+			html`${UPLOAD_TYPES.map(
+				(t, i) => html`<label class="type">
+					<input type="radio" name="data_type" value="${t}" ${i === 0 ? 'checked' : ''} />
+					<span class="type__body"><span class="type__label">${TYPES[t].label}</span>
+						<span class="type__cols"><span class="secondary">Required:</span> ${TYPES[t].required.join(', ')}</span>
+						<span class="type__cols"><span class="secondary">Optional:</span> ${TYPES[t].optional.join(', ')}</span>
+						<span class="type__note">${TYPES[t].note}</span></span></label>`,
+			)}`,
+		);
+
+		const form = $<HTMLFormElement>('#upload-form')!;
+		const input = $<HTMLInputElement>('#upload-file')!;
+		const submit = $<HTMLButtonElement>('#upload-submit')!;
+		const drop = $('#drop')!;
+		let file: File | null = null;
+
+		const selectedType = () => (new FormData(form).get('data_type') as UploadType) ?? 'customers';
+		const refreshButton = () => {
+			const t = selectedType();
+			submit.textContent = file ? `Upload ${TYPES[t].label.toLowerCase()} file` : 'Upload';
+		};
+
+		function choose(f: File | null) {
+			file = null;
+			const meta = $('#file-meta');
+			if (!f) {
+				mount(meta, '');
+				submit.disabled = true;
+				refreshButton();
+				return;
+			}
+			const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+			const problems: string[] = [];
+			if (!EXTENSIONS.includes(ext)) problems.push('Use a .csv, .xlsx, .xls or .json file.');
+			if (f.size > MAX_BYTES) problems.push(`The file is ${bytes(f.size)}; the limit is 10 MB.`);
+			if (f.size === 0) problems.push('The file is empty.');
+			mount(
+				meta,
+				html`<dl class="facts file-meta"><div><dt>File</dt><dd>${f.name}</dd></div><div><dt>Size</dt><dd class="tnum">${bytes(f.size)}</dd></div>
+					<div><dt>Type</dt><dd>${f.type || ext.slice(1).toUpperCase()}</dd></div><div><dt>Modified</dt><dd>${epochDateTime(Math.round(f.lastModified / 1000))}</dd></div>
+					<div><dt>Will load as</dt><dd>${TYPES[selectedType()].label}</dd></div></dl>
+					${problems.length ? html`<p class="callout callout--critical">${problems.join(' ')}</p>` : ''}`,
+			);
+			if (!problems.length) file = f;
+			submit.disabled = !file;
+			refreshButton();
+		}
+
+		input.addEventListener('change', () => choose(input.files?.[0] ?? null));
+		form.addEventListener('change', (e) => {
+			if ((e.target as HTMLInputElement).name === 'data_type') choose(file ?? input.files?.[0] ?? null);
+		});
+		drop.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			drop.classList.add('is-over');
+		});
+		drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+		drop.addEventListener('drop', (e) => {
+			e.preventDefault();
+			drop.classList.remove('is-over');
+			const f = e.dataTransfer?.files?.[0] ?? null;
+			if (f) {
+				const dt = new DataTransfer();
+				dt.items.add(f);
+				input.files = dt.files;
+			}
+			choose(f);
+		});
+
+		form.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			if (!file) return;
+			const type = selectedType();
+			const out = $('#upload-result');
+			submit.disabled = true;
+			submit.classList.add('is-busy');
+			mount(out, '');
+			try {
+				const result = await upload(type, file);
+				if (signal.aborted) return;
+				mount(out, resultView(result, type));
+				const log = [{ ...result, data_type: type, at: Math.round(Date.now() / 1000) }, ...readLog()].slice(0, 30);
+				sessionStorage.setItem(LOG_KEY, JSON.stringify(log));
+				renderLog();
+				if (canAssess) showScope();
+				toast(
+					result.status === 'error' ? `${file.name} was rejected.` : `${count(result.records_loaded)} records loaded from ${file.name}.`,
+					result.status === 'error' ? 'critical' : 'good',
+				);
+				form.reset();
+				$$<HTMLInputElement>('input[name=data_type]').forEach((r) => (r.checked = r.value === type));
+				choose(null);
+			} catch (error) {
+				if (signal.aborted) return;
+				mount(out, errorState(error, false));
+				submit.disabled = false;
+			} finally {
+				submit.classList.remove('is-busy');
+			}
+		});
+		refreshButton();
+	});
+</script>

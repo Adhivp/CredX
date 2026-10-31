@@ -1,0 +1,290 @@
+---
+import { ViewTransitions } from 'astro:transitions';
+import BrandMark from '../components/BrandMark.astro';
+import { NAV } from '../lib/permissions';
+import '../styles/tokens.css';
+import '../styles/base.css';
+import '../styles/components.css';
+import '../styles/charts.css';
+import '../styles/pages.css';
+
+interface Props {
+	title: string;
+	page: string;
+	/** Sign-in page: no navigation, no session required. */
+	bare?: boolean;
+}
+
+const { title, page, bare = false } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en-IN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="CredX — continuous credit intelligence and early warning for lending portfolios." />
+		<meta name="robots" content="noindex" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+			rel="stylesheet"
+		/>
+		<title>{title} · CredX</title>
+		<ViewTransitions />
+	</head>
+	<body data-page={page} data-auth={bare ? 'public' : 'pending'}>
+		<a class="skip-link" href="#main">Skip to content</a>
+		<div class="frame">
+			{
+				!bare && (
+					<header class="header" transition:name="app-header" transition:animate="none">
+						<div class="header__inner">
+							<a class="brand" href="/overview" data-home>
+								<BrandMark />
+								<span>
+									CredX
+									<span class="brand__tag">Continuous credit intelligence</span>
+								</span>
+							</a>
+							<nav class="nav" id="primary-nav" aria-label="Primary">
+								<ul class="nav__list">
+									{NAV.map((item) => (
+										<li data-needs={item.needs.join(' ')} hidden>
+											<a
+												class="nav__link"
+												href={item.href}
+												aria-current={item.page === page ? 'page' : undefined}
+												data-nav={item.page}
+											>
+												{item.label}
+												{item.page === 'reviews' && <span class="nav__count" data-review-count hidden />}
+											</a>
+										</li>
+									))}
+								</ul>
+							</nav>
+							<div class="header__tools">
+								<button
+									type="button"
+									class="icon-btn"
+									data-action="toggle-goto"
+									aria-label="Open a customer by ID"
+									aria-expanded="false"
+									aria-controls="goto"
+									data-needs="view_customer"
+									hidden
+								>
+									<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+										<circle cx="9" cy="9" r="5.5" />
+										<path d="m13.2 13.2 3.8 3.8" stroke-linecap="round" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="icon-btn nav-toggle"
+									data-action="toggle-nav"
+									aria-label="Menu"
+									aria-expanded="false"
+									aria-controls="primary-nav"
+								>
+									<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+										<path d="M4 6h12M4 10h12M4 14h12" stroke-linecap="round" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="user-chip"
+									data-action="toggle-menu"
+									aria-haspopup="true"
+									aria-expanded="false"
+									aria-controls="user-menu"
+								>
+									<span class="avatar" data-user-initials>··</span>
+									<span class="user-chip__text">
+										<span class="user-chip__name" data-user-name>Signed in</span>
+										<span class="user-chip__role" data-user-role></span>
+									</span>
+								</button>
+							</div>
+						</div>
+						<form class="goto" id="goto" data-goto hidden>
+							<div class="field" style="margin:0">
+								<label class="field__label" for="goto-id">Open customer by ID</label>
+								<input
+									class="input"
+									id="goto-id"
+									name="id"
+									autocomplete="off"
+									spellcheck="false"
+									required
+									maxlength="64"
+									placeholder="Customer ID, e.g. as uploaded"
+								/>
+								<span class="field__hint">Opens the customer if it exists within your data scope.</span>
+							</div>
+						</form>
+						<div class="menu" id="user-menu" role="menu" hidden>
+							<div class="menu__head">
+								<div class="row__title" data-user-name></div>
+								<div class="row__sub" data-user-email></div>
+								<div class="row__sub" data-user-role></div>
+							</div>
+							<a class="menu__item" role="menuitem" href="/account">Account and system status</a>
+							<button type="button" class="menu__item" role="menuitem" data-action="sign-out">Sign out</button>
+						</div>
+					</header>
+				)
+			}
+			<main class="main" id="main" tabindex="-1">
+				<slot />
+			</main>
+		</div>
+		<div class="toasts" id="toasts" aria-live="polite"></div>
+	</body>
+</html>
+
+<script>
+	import { navigate } from 'astro:transitions/client';
+	import { setSessionExpiredHandler } from '../lib/api/client';
+	import { logout } from '../lib/api/auth';
+	import { reviewQueue } from '../lib/api/governance';
+	import { SESSION_KEY, loadUser, hasSession } from '../lib/api/session';
+	import { can, homeFor, roleLabel, type Permission } from '../lib/permissions';
+	import { signInUrl } from '../lib/page';
+	import type { User } from '../lib/types';
+
+	let redirecting = false;
+	function toSignIn(reason?: 'expired' | 'signed-out') {
+		if (redirecting || document.body.dataset.auth === 'public') return;
+		redirecting = true;
+		void navigate(signInUrl(reason)).finally(() => (redirecting = false));
+	}
+
+	setSessionExpiredHandler(() => toSignIn('expired'));
+
+	// Another tab signed out (tokens removed): follow it.
+	window.addEventListener('storage', (event) => {
+		if (event.key === SESSION_KEY && event.newValue === null) toSignIn('signed-out');
+	});
+
+	function initials(name: string) {
+		return name
+			.split(/\s+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((p) => p[0]?.toUpperCase())
+			.join('');
+	}
+
+	/** Show only navigation the role can use (presentation only; the API enforces access). */
+	function applyUser(user: User) {
+		document.querySelectorAll<HTMLElement>('[data-needs]').forEach((el) => {
+			const needs = (el.dataset.needs ?? '').split(' ').filter(Boolean) as Permission[];
+			el.hidden = !needs.some((p) => can(user.role, p));
+		});
+		document.querySelectorAll('[data-user-name]').forEach((el) => (el.textContent = user.full_name));
+		document.querySelectorAll('[data-user-email]').forEach((el) => (el.textContent = user.email));
+		document.querySelectorAll('[data-user-role]').forEach((el) => (el.textContent = roleLabel(user.role)));
+		document.querySelectorAll('[data-user-initials]').forEach((el) => (el.textContent = initials(user.full_name)));
+		document.querySelectorAll<HTMLAnchorElement>('[data-home]').forEach((el) => (el.href = homeFor(user.role)));
+		document.body.dataset.auth = 'ready';
+		if (can(user.role, 'view_review_queue')) void showReviewCount();
+	}
+
+	async function showReviewCount() {
+		const badge = document.querySelector<HTMLElement>('[data-review-count]');
+		if (!badge) return;
+		try {
+			const queue = await reviewQueue();
+			badge.textContent = String(queue.items.length);
+			badge.hidden = queue.items.length === 0;
+			badge.setAttribute('aria-label', `${queue.items.length} open reviews`);
+		} catch {
+			badge.hidden = true;
+		}
+	}
+
+	function closePopovers(except?: string) {
+		for (const [id, toggle] of [
+			['user-menu', 'toggle-menu'],
+			['goto', 'toggle-goto'],
+		]) {
+			if (id === except) continue;
+			const el = document.getElementById(id);
+			if (el) el.hidden = true;
+			document.querySelector(`[data-action="${toggle}"]`)?.setAttribute('aria-expanded', 'false');
+		}
+	}
+
+	function toggle(id: string, button: Element) {
+		const el = document.getElementById(id);
+		if (!el) return;
+		closePopovers(id);
+		el.hidden = !el.hidden;
+		button.setAttribute('aria-expanded', String(!el.hidden));
+		if (!el.hidden) (el.querySelector('input, a, button') as HTMLElement | null)?.focus();
+	}
+
+	document.addEventListener('click', async (event) => {
+		const target = event.target as Element;
+		const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
+		if (action === 'toggle-menu') return toggle('user-menu', target.closest('[data-action]')!);
+		if (action === 'toggle-goto') return toggle('goto', target.closest('[data-action]')!);
+		if (action === 'toggle-nav') {
+			const nav = document.getElementById('primary-nav');
+			nav?.classList.toggle('is-open');
+			target.closest('[data-action]')?.setAttribute('aria-expanded', String(nav?.classList.contains('is-open')));
+			return;
+		}
+		if (action === 'sign-out') {
+			closePopovers();
+			await logout();
+			void navigate('/?signedout=1');
+			return;
+		}
+		if (!target.closest('.menu, .goto, .user-chip, [data-action="toggle-goto"]')) closePopovers();
+	});
+
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') closePopovers();
+	});
+
+	document.addEventListener('submit', (event) => {
+		const form = event.target as HTMLFormElement;
+		if (!form.matches('[data-goto]')) return;
+		event.preventDefault();
+		const id = String(new FormData(form).get('id') ?? '').trim();
+		if (!id) return;
+		closePopovers();
+		form.reset();
+		void navigate(`/customer?id=${encodeURIComponent(id)}`);
+	});
+
+	document.addEventListener('astro:page-load', () => {
+		document.getElementById('primary-nav')?.classList.remove('is-open');
+		if (document.body.dataset.auth === 'public') return;
+		if (!hasSession()) return; // the page guard redirects
+		const cached = loadUser();
+		if (cached) applyUser(cached);
+	});
+
+	// The page guard resolves the user from the API; refresh the chrome when it does.
+	document.addEventListener('credx:user', (event) => applyUser((event as CustomEvent<User>).detail));
+
+	let ticking = false;
+	window.addEventListener(
+		'scroll',
+		() => {
+			if (ticking) return;
+			ticking = true;
+			requestAnimationFrame(() => {
+				document.querySelector('.header')?.classList.toggle('is-scrolled', window.scrollY > 4);
+				ticking = false;
+			});
+		},
+		{ passive: true },
+	);
+</script>

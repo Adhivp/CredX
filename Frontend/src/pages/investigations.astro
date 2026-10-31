@@ -1,0 +1,183 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Investigations" page="investigations">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Investigations</h1>
+			<p class="page-head__lede">
+				Evidence investigations run by specialist agents, most recently updated first. Each one stops for a person wherever policy
+				requires a human decision.
+			</p>
+		</div>
+		<div class="page-head__actions" id="iv-actions"></div>
+	</header>
+
+	<section class="panel panel--flush">
+		<div class="iv-tabs tabs" role="tablist" aria-label="Filter by status" id="iv-tabs"></div>
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Subject</th>
+						<th scope="col">Status</th>
+						<th scope="col">Classification</th>
+						<th scope="col" class="num">Round</th>
+						<th scope="col">Trigger</th>
+						<th scope="col">Agents</th>
+						<th scope="col">Started</th>
+						<th scope="col">Updated</th>
+					</tr>
+				</thead>
+				<tbody id="iv-body"></tbody>
+			</table>
+		</div>
+		<div id="iv-empty"></div>
+		<nav class="pager" id="iv-pager" aria-label="Investigation pages" hidden></nav>
+	</section>
+</AppShell>
+
+<script>
+	import { initiate, list } from '../lib/api/investigations';
+	import { portfolioIntelligence } from '../lib/api/governance';
+	import { isAbort } from '../lib/api/client';
+	import { epochDate, humanize, relative } from '../lib/format';
+	import { html, mount } from '../lib/html';
+	import { CLASSIFICATION, INVESTIGATION_STATUS, SEVERITY, textOf, toneOf } from '../lib/labels';
+	import { $, $$, definePage, navigate, setParams, type PageContext } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import { emptyState, errorState, openDialog, pill, statusPill, summary, toast } from '../lib/ui';
+
+	const PAGE = 25;
+	const TABS: [string, string][] = [
+		['', 'All'],
+		['investigating', 'Investigating'],
+		['awaiting_analyst_review', 'Awaiting analyst review'],
+		['awaiting_approval', 'Awaiting approval'],
+		['incomplete', 'Incomplete evidence'],
+		['monitoring', 'Monitoring'],
+		['approved', 'Approved'],
+		['rejected', 'Rejected'],
+		['cancelled', 'Cancelled'],
+		['failed', 'Failed'],
+	];
+
+	async function refresh(ctx: PageContext) {
+		const params = new URLSearchParams(location.search);
+		const status = params.get('status') ?? '';
+		const page = Math.max(1, Number(params.get('page')) || 1);
+		$$('#iv-tabs [data-status]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.status === status)));
+		const body = $('#iv-body');
+		const empty = $('#iv-empty');
+		const pager = $('#iv-pager')!;
+		if (body && !body.children.length) mount(body, html`${Array.from({ length: 5 }, () => html`<tr>${Array.from({ length: 8 }, () => html`<td><span class="skeleton skeleton--line"></span></td>`)}</tr>`)}`);
+		else body?.classList.add('is-refreshing');
+		mount(empty, '');
+		try {
+			// One extra row tells whether a next page exists; the API returns no total.
+			const res = await list({ status: status || undefined, limit: PAGE + 1, offset: (page - 1) * PAGE });
+			if (ctx.signal.aborted) return;
+			const items = res.items.slice(0, PAGE);
+			if (!items.length) {
+				mount(body, '');
+				pager.hidden = page === 1;
+				mount(
+					empty,
+					emptyState(
+						status ? `No investigations are ${textOf(INVESTIGATION_STATUS, status).toLowerCase()}` : 'No investigations yet',
+						status ? 'Choose another status.' : 'Start an investigation from a customer page; agents then gather and cite evidence.',
+						status ? undefined : html`<a class="btn btn--secondary btn--sm" href="/watchlist">Open the watchlist</a>`,
+					),
+				);
+			} else {
+				mount(
+					body,
+					html`${items.map((i) => {
+						const href = `/investigation?id=${encodeURIComponent(i.id)}`;
+						const cls = i.effective_classification;
+						return html`<tr class="is-link" data-href="${href}">
+							<td><a class="row-link" href="${href}">${i.scope === 'customer' ? i.customer_id : `Portfolio: ${i.segment ? humanize(i.segment) : 'all segments'}`}</a>
+								<div class="row__sub">${i.scope === 'customer' ? (i.segment ? humanize(i.segment) : 'Customer') : 'Portfolio investigation'}</div></td>
+							<td>${statusPill(i.status)}</td>
+							<td>${cls?.classification
+								? html`${pill(textOf(CLASSIFICATION, cls.classification), toneOf(CLASSIFICATION, cls.classification))}<div class="row__sub">${textOf(SEVERITY, cls.severity)}${cls.source === 'human_override' ? ', human override' : cls.source === 'human_accepted' ? ', accepted by a manager' : ''}</div>`
+								: html`<span class="muted">Not adjudicated</span>`}</td>
+							<td class="num">${i.round}</td>
+							<td>${humanize(i.trigger)}</td>
+							<td>${i.run_state === 'running' ? pill('Running', 'info') : html`<span class="muted">Idle</span>`}</td>
+							<td class="nowrap">${epochDate(i.created_at)}</td>
+							<td class="nowrap">${relative(i.updated_at)}</td></tr>`;
+					})}`,
+				);
+				const hasNext = res.items.length > PAGE;
+				pager.hidden = page === 1 && !hasNext;
+				mount(
+					pager,
+					html`<span>Page ${page}</span><span class="btn-row"><button type="button" class="btn btn--ghost btn--sm" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</button>
+					<button type="button" class="btn btn--ghost btn--sm" data-page="${page + 1}" ${hasNext ? '' : 'disabled'}>Next</button></span>`,
+				);
+			}
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			mount(body, '');
+			mount(empty, errorState(error));
+			$('[data-retry]', empty!)?.addEventListener('click', () => void refresh(ctx), { once: true });
+		} finally {
+			body?.classList.remove('is-refreshing');
+		}
+	}
+
+	async function startPortfolio() {
+		let segments: string[] = [];
+		try {
+			segments = (await portfolioIntelligence()).segments.map((g) => g.group).filter((g) => g !== 'unspecified');
+		} catch {
+			// Free text if the aggregate is unavailable.
+		}
+		openDialog({
+			title: 'Start a portfolio investigation',
+			description: 'The portfolio specialist analyses deterioration clusters and concentration across the selected segment. Results are aggregate only.',
+			fields: [
+				segments.length
+					? { name: 'segment', label: 'Segment', type: 'select', options: [{ value: '', text: 'All segments in your scope' }, ...segments.map((s) => ({ value: s, text: humanize(s) }))] }
+					: { name: 'segment', label: 'Segment (exact, empty for all)', maxLength: 64 },
+				{ name: 'question', label: 'Question (optional)', type: 'textarea', maxLength: 1000 },
+			],
+			submit: 'Start investigation',
+			confirm: (v) => summary([['Segment', v.segment ? humanize(v.segment) : 'All segments in your scope'], ['Question', v.question || 'None']]),
+			onSubmit: async (v) => {
+				const ws = await initiate({ scope: 'portfolio', portfolio_segment: v.segment || null, question: v.question || undefined });
+				toast('Portfolio investigation started.');
+				void navigate(`/investigation?id=${encodeURIComponent(ws.id)}`);
+			},
+		});
+	}
+
+	definePage('investigations', async (ctx) => {
+		mount($('#iv-tabs'), html`${TABS.map(([v, t]) => html`<button type="button" class="tab" role="tab" data-status="${v}" aria-selected="false">${t}</button>`)}`);
+		if (can(ctx.user.role, 'initiate_portfolio_investigation')) {
+			mount($('#iv-actions'), html`<button type="button" class="btn btn--primary" id="iv-portfolio">Start portfolio investigation</button>`);
+			$('#iv-portfolio')?.addEventListener('click', () => void startPortfolio());
+		}
+		$('#iv-tabs')?.addEventListener('click', (e) => {
+			const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-status]');
+			if (!tab) return;
+			setParams({ status: tab.dataset.status || null, page: null });
+			void refresh(ctx);
+		});
+		$('#iv-pager')?.addEventListener('click', (e) => {
+			const page = (e.target as HTMLElement).closest<HTMLElement>('[data-page]')?.dataset.page;
+			if (!page) return;
+			setParams({ page: Number(page) > 1 ? page : null });
+			void refresh(ctx);
+		});
+		$('#iv-body')?.addEventListener('click', (e) => {
+			const t = e.target as HTMLElement;
+			if (t.closest('a, button')) return;
+			const href = t.closest<HTMLElement>('tr[data-href]')?.dataset.href;
+			if (href) void navigate(href);
+		});
+		await refresh(ctx);
+	});
+</script>

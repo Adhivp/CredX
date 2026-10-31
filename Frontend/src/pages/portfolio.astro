@@ -1,0 +1,253 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Portfolio" page="portfolio">
+	<header class="page-head">
+		<div>
+			<h1 class="page-head__title page-head__title--sm">Portfolio concentration</h1>
+			<p class="page-head__lede" id="pf-lede">Where deterioration and exposure concentrate across segments, products and employment groups.</p>
+		</div>
+		<div class="page-head__actions">
+			<div class="field pf-segment"><label class="field__label" for="pf-segment">Segment</label><select class="input" id="pf-segment"><option value="">All segments in scope</option></select></div>
+		</div>
+	</header>
+	<div id="pf-root"></div>
+</AppShell>
+
+<script>
+	import { portfolioSummary } from '../lib/api/ews';
+	import { portfolioIntelligence } from '../lib/api/governance';
+	import { isAbort } from '../lib/api/client';
+	import { donut, hbars, stacked, tableView } from '../lib/charts';
+	import { count, humanize, money, moneyCompact, pct, score } from '../lib/format';
+	import { html, mount, type Html } from '../lib/html';
+	import { $, $$, definePage, setParams, type PageContext } from '../lib/page';
+	import { can } from '../lib/permissions';
+	import { RISK_CATEGORIES, type PortfolioGroup, type PortfolioIntelligence, type PortfolioSummary } from '../lib/types';
+	import { emptyState, errorState, riskBadge, riskClass, skeleton } from '../lib/ui';
+
+	type Dim = 'segments' | 'products' | 'employment';
+	const DIMS: [Dim, string][] = [
+		['segments', 'Segment'],
+		['products', 'Product'],
+		['employment', 'Employment'],
+	];
+	const PLACEHOLDER: Record<string, string> = { unspecified: 'Not recorded', none: 'No facility' };
+	const label = (g: string) => PLACEHOLDER[g] ?? humanize(g);
+
+	let dim: Dim = 'segments';
+	let intel: PortfolioIntelligence | null = null;
+
+	function drill(d: Dim, g: string, ctx: PageContext): string | undefined {
+		if (!can(ctx.user.role, 'view_customer') || PLACEHOLDER[g]) return undefined;
+		if (d === 'segments') return `/watchlist?customer_segment=${encodeURIComponent(g)}`;
+		if (d === 'products') return `/watchlist?product_type=${encodeURIComponent(g)}`;
+		return undefined; // the watchlist cannot filter by employment
+	}
+
+	function kpis(i: PortfolioIntelligence): Html {
+		return html`<div class="kpis pf-kpis">
+			<div class="kpi"><span class="kpi__label">Customers analysed</span><span class="kpi__value">${count(i.customers)}</span><span class="kpi__detail">Groups under ${i.suppressed_below} customers are suppressed</span></div>
+			<div class="kpi"><span class="kpi__label">In deterioration</span><span class="kpi__value">${pct(i.portfolio_deteriorating_share)}</span><span class="kpi__detail">Emerging, sustained or accelerating, classified now from current records</span></div>
+			<div class="kpi"><span class="kpi__label">Exposure at risk</span><span class="kpi__value">${moneyCompact(i.total_exposure)}</span><span class="kpi__detail">Sum of each customer's exposure at risk (exposure profile)</span></div>
+			<div class="kpi"><span class="kpi__label">Segment concentration</span><span class="kpi__value">${i.segment_exposure_hhi.toFixed(2)}</span><span class="kpi__detail">Herfindahl index of exposure share across visible segments, 0 to 1; higher is more concentrated</span></div>
+			<div class="kpi"><span class="kpi__label">Deterioration clusters</span><span class="kpi__value">${count(i.clusters.length)}</span><span class="kpi__detail">${i.clusters.length ? i.clusters.map(label).join(', ') : 'No segment exceeds the portfolio share by 15 points with 2 or more deteriorating customers'}</span></div>
+		</div>`;
+	}
+
+	function groupsView(i: PortfolioIntelligence, ctx: PageContext): Html {
+		const groups = i[dim];
+		const shown = groups.filter((g) => !g.suppressed).sort((a, b) => (b.deteriorating_share ?? 0) - (a.deteriorating_share ?? 0));
+		const suppressed = groups.filter((g) => g.suppressed);
+		if (!groups.length) return emptyState('No groups to show');
+		const dimLabel = DIMS.find(([d]) => d === dim)![1].toLowerCase();
+		const suppressedNote = suppressed.length
+			? html`<p class="note">${suppressed.length} ${dimLabel} group${suppressed.length === 1 ? '' : 's'} (${suppressed.map((g) => label(g.group)).join(', ')}) ${suppressed.length === 1 ? 'has' : 'have'} fewer than ${i.suppressed_below} customers and ${suppressed.length === 1 ? 'is' : 'are'} suppressed so individuals cannot be inferred.</p>`
+			: '';
+		if (!shown.length) return html`${emptyState(`Every ${dimLabel} group is suppressed`, `Groups need at least ${i.suppressed_below} customers to be shown.`)}${suppressedNote}`;
+		const share = hbars(
+			shown.map((g) => ({
+				label: label(g.group),
+				value: g.deteriorating_share ?? 0,
+				display: pct(g.deteriorating_share ?? 0),
+				tip: `${label(g.group)}\n${count(g.deteriorating ?? 0)} of ${count(g.customers ?? 0)} customers deteriorating${g.cluster ? '\nFlagged as a deterioration cluster' : ''}`,
+				cls: g.cluster ? 'fill-risk-high' : 'fill-accent',
+				href: drill(dim, g.group, ctx),
+				note: g.cluster ? 'Cluster: well above the portfolio share' : undefined,
+			})),
+			{ max: 1, reference: { value: i.portfolio_deteriorating_share, label: `Portfolio share ${pct(i.portfolio_deteriorating_share)}` }, label: `Deteriorating share by ${dimLabel}` },
+		);
+		const composition = stacked(
+			shown.map((g) => {
+				const det = g.deteriorating ?? 0;
+				const ins = g.insufficient_evidence ?? 0;
+				const rest = Math.max(0, (g.customers ?? 0) - det - ins);
+				return {
+					label: label(g.group),
+					href: drill(dim, g.group, ctx),
+					total: g.customers ?? 0,
+					display: count(g.customers ?? 0),
+					parts: [
+						{ key: 'det', value: det, cls: 'fill-risk-high', tip: `${label(g.group)}: ${count(det)} deteriorating` },
+						{ key: 'ins', value: ins, cls: 'fill-risk-insufficient', tip: `${label(g.group)}: ${count(ins)} with insufficient evidence` },
+						{ key: 'rest', value: rest, cls: 'fill-risk-low', tip: `${label(g.group)}: ${count(rest)} not deteriorating` },
+					],
+				};
+			}),
+			[
+				{ cls: 'fill-risk-high', label: 'Deteriorating' },
+				{ cls: 'fill-risk-insufficient', label: 'Insufficient evidence' },
+				{ cls: 'fill-risk-low', label: 'Not deteriorating' },
+			],
+			`Customer composition by ${dimLabel}`,
+		);
+		const exposure = stacked(
+			shown.map((g) => {
+				const det = g.deteriorating_exposure ?? 0;
+				const rest = Math.max(0, (g.exposure ?? 0) - det);
+				return {
+					label: label(g.group),
+					total: g.exposure ?? 0,
+					display: moneyCompact(g.exposure ?? 0),
+					parts: [
+						{ key: 'det', value: det, cls: 'fill-risk-high', tip: `${label(g.group)}: ${money(det)} exposure at risk with deteriorating customers` },
+						{ key: 'rest', value: rest, cls: 'fill-accent-soft', tip: `${label(g.group)}: ${money(rest)} with other customers` },
+					],
+				};
+			}),
+			[
+				{ cls: 'fill-risk-high', label: 'Deteriorating customers' },
+				{ cls: 'fill-accent-soft', label: 'Other customers' },
+			],
+			`Exposure at risk by ${dimLabel}`,
+		);
+		const rows = groups.map((g) =>
+			g.suppressed
+				? [label(g.group), `Suppressed (under ${i.suppressed_below})`, '', '', '', '', '', '', '', '', '']
+				: [
+						label(g.group),
+						count(g.customers ?? 0),
+						count(g.deteriorating ?? 0),
+						pct(g.deteriorating_share ?? 0),
+						count(g.insufficient_evidence ?? 0),
+						money(g.exposure ?? 0),
+						money(g.deteriorating_exposure ?? 0),
+						pct(g.exposure_share ?? 0),
+						g.mean_score === null || g.mean_score === undefined ? '—' : score(g.mean_score),
+						pct(g.cash_declining_share ?? 0),
+						g.cluster ? 'Yes' : 'No',
+					],
+		);
+		return html`<div class="grid">
+			<section class="panel col-6"><div class="panel__head"><h2 class="panel__title">Deteriorating share</h2><span class="panel__meta">Share of customers per group</span></div>${share}</section>
+			<section class="panel col-6"><div class="panel__head"><h2 class="panel__title">Customer composition</h2><span class="panel__meta">Customers per group</span></div>${composition}</section>
+			<section class="panel col-12"><div class="panel__head"><h2 class="panel__title">Exposure at risk</h2><span class="panel__meta">INR, from each customer's exposure profile</span></div>${exposure}
+				${suppressedNote}
+				<div class="pf-table">${tableView(`Portfolio groups by ${dimLabel}`, ['Group', 'Customers', 'Deteriorating', 'Share', 'Insufficient evidence', 'Exposure at risk', 'Deteriorating exposure', 'Exposure share', 'Mean score', 'Cash flow declining', 'Cluster'], rows)}</div>
+				<div class="btn-row pf-export"><button type="button" class="btn btn--ghost btn--sm" data-export>Download this table as CSV</button></div>
+			</section>
+		</div>
+		<p class="note pf-causal">Shares describe how often deterioration co-occurs with a group; they do not show that the group causes it.</p>`;
+	}
+
+	function categories(s: PortfolioSummary): Html {
+		const total = s.total_assessed;
+		const segs = RISK_CATEGORIES.map((c) => ({ key: c, label: c, value: s.risk_distribution[c] ?? 0, cls: `fill-risk-${riskClass(c)}`, tip: `${c}\n${count(s.risk_distribution[c] ?? 0)} customers` }));
+		return html`<div class="panel__head"><h2 class="panel__title">Warning categories</h2><span class="panel__meta">Latest stored assessment per customer</span></div>
+			<div class="pf-cats">${donut(segs, { size: 150, thickness: 16, label: 'Warning category distribution', center: html`<span class="pf-cats__n">${count(total)}</span><span class="note">assessed</span>` })}
+			<ul class="pf-cats__list">${segs.map((g) => html`<li>${riskBadge(g.key, 'sm')}<span class="tnum">${count(g.value)}</span><span class="tnum muted">${pct(total ? g.value / total : 0)}</span></li>`)}</ul></div>
+			<p class="note">Exposure by warning category is not shown: the API exposes only each customer's largest facility in the watchlist, so a correct category total cannot be computed.</p>`;
+	}
+
+	function exportCsv(i: PortfolioIntelligence) {
+		const head = ['dimension', 'group', 'suppressed', 'customers', 'deteriorating', 'deteriorating_share', 'insufficient_evidence', 'exposure', 'deteriorating_exposure', 'exposure_share', 'mean_score', 'cash_declining_share', 'cluster'];
+		const lines = [head.join(',')];
+		for (const [d] of DIMS) {
+			for (const g of i[d] as PortfolioGroup[]) {
+				const row = [d, g.group, g.suppressed, g.customers, g.deteriorating, g.deteriorating_share, g.insufficient_evidence, g.exposure, g.deteriorating_exposure, g.exposure_share, g.mean_score, g.cash_declining_share, g.cluster];
+				lines.push(row.map((x) => (x === undefined || x === null ? '' : /[",\n]/.test(String(x)) ? `"${String(x).replace(/"/g, '""')}"` : String(x))).join(','));
+			}
+		}
+		const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/csv' });
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = `credx-portfolio-${i.calculation.input_digest.slice(0, 8)}.csv`;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+	}
+
+	async function render(ctx: PageContext) {
+		const root = $('#pf-root')!;
+		const segment = new URLSearchParams(location.search).get('segment') ?? '';
+		if (!intel) mount(root, html`<div class="panel">${skeleton(6)}</div>`);
+		else root.classList.add('is-refreshing');
+		try {
+			const [i, s] = await Promise.all([portfolioIntelligence(segment || undefined), can(ctx.user.role, 'view_customer') && !segment ? portfolioSummary().catch(() => null) : Promise.resolve(null)]);
+			if (ctx.signal.aborted) return;
+			intel = i;
+			mount(
+				$('#pf-lede'),
+				html`Where deterioration and exposure concentrate${segment ? ` within ${label(segment)}` : ' across your data scope'}. Computed now by ${i.calculation.name} v${i.calculation.version} from current records (input digest ${i.calculation.input_digest.slice(0, 12)}).`,
+			);
+			if (!i.customers) {
+				mount(root, html`<div class="panel">${emptyState('No customers to analyse', can(ctx.user.role, 'upload_data') ? 'Upload portfolio data to see concentration.' : 'There are no customers in your data scope.')}</div>`);
+				return;
+			}
+			mount(
+				root,
+				html`${kpis(i)}
+				<div class="pf-bar">
+					<div class="tabs pf-tabs" role="tablist" aria-label="Group by">${DIMS.map(([d, t]) => html`<button type="button" class="tab" role="tab" data-dim="${d}" aria-selected="${String(d === dim)}">${t}</button>`)}</div>
+					<p class="note">Group labels open the matching watchlist where the watchlist can filter by that dimension.</p>
+				</div>
+				<div id="pf-groups">${groupsView(i, ctx)}</div>
+				${s ? html`<section class="panel section">${categories(s)}</section>` : ''}
+				<section class="panel section pf-limits"><h2 class="panel__title">Not available from the API</h2>
+					<p class="note">Risk distribution over time, customers moving between categories, and date filters need assessment history aggregated across the portfolio. The backend stores each customer's assessment history but has no portfolio time-series endpoint, so these views are not shown rather than estimated.</p></section>`,
+			);
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			mount(root, html`<div class="panel">${errorState(error)}</div>`);
+			$('[data-retry]', root)?.addEventListener('click', () => void render(ctx), { once: true });
+		} finally {
+			root.classList.remove('is-refreshing');
+		}
+	}
+
+	definePage('portfolio', async (ctx) => {
+		intel = null;
+		dim = 'segments';
+		const select = $<HTMLSelectElement>('#pf-segment')!;
+		const segment = ctx.params.get('segment') ?? '';
+		try {
+			const all = await portfolioIntelligence();
+			for (const g of all.segments) {
+				if (g.group === 'unspecified') continue;
+				const o = document.createElement('option');
+				o.value = g.group;
+				o.textContent = label(g.group) + (g.suppressed ? ' (small group)' : '');
+				select.appendChild(o);
+			}
+		} catch {
+			// The page render reports the error.
+		}
+		select.value = segment;
+		select.addEventListener('change', () => {
+			setParams({ segment: select.value || null });
+			void render(ctx);
+		});
+		$('#pf-root')?.addEventListener('click', (e) => {
+			const t = e.target as HTMLElement;
+			const d = t.closest<HTMLElement>('[data-dim]')?.dataset.dim as Dim | undefined;
+			if (d && intel) {
+				dim = d;
+				$$('[data-dim]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.dim === d)));
+				mount($('#pf-groups'), groupsView(intel, ctx));
+				return;
+			}
+			if (t.closest('[data-export]') && intel) exportCsv(intel);
+		});
+		await render(ctx);
+	});
+</script>

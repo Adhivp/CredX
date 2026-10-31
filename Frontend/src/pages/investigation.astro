@@ -1,0 +1,40 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+
+<AppShell title="Investigation" page="investigation">
+	<nav class="crumbs" aria-label="Breadcrumb"><a href="/investigations">Investigations</a><span aria-hidden="true">/</span><span id="ws-crumb">Investigation</span></nav>
+	<div id="ws-root"></div>
+</AppShell>
+
+<script>
+	import { workspace } from '../lib/api/investigations';
+	import { ApiError, isAbort } from '../lib/api/client';
+	import { html, mount } from '../lib/html';
+	import { $, definePage, type PageContext } from '../lib/page';
+	import { emptyState, errorState, skeleton } from '../lib/ui';
+	import { createWorkspace } from '../lib/workspace';
+
+	definePage('investigation', async (ctx: PageContext) => {
+		const id = ctx.params.get('id')?.trim();
+		const root = $('#ws-root')!;
+		if (!id) {
+			mount(root, emptyState('No investigation selected', 'Open one from the investigations list.', html`<a class="btn btn--primary btn--sm" href="/investigations">Investigations</a>`));
+			return;
+		}
+		mount(root, html`<div class="panel">${skeleton(8)}</div>`);
+		try {
+			const ws = await workspace(id, ctx.signal);
+			if (ctx.signal.aborted) return;
+			createWorkspace(root, ws, ctx, { mode: 'full' });
+		} catch (error) {
+			if (isAbort(error) || ctx.signal.aborted) return;
+			if (error instanceof ApiError && error.notFound) {
+				mount(root, html`<div class="panel">${emptyState('Investigation not found', 'It may not exist, or it is outside your data scope.', html`<a class="btn btn--secondary btn--sm" href="/investigations">Back to investigations</a>`)}</div>`);
+				return;
+			}
+			mount(root, html`<div class="panel">${errorState(error)}</div>`);
+			$('[data-retry]', root)?.addEventListener('click', () => location.reload(), { once: true });
+		}
+	});
+</script>
