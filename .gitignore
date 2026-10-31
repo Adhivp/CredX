@@ -1,0 +1,17 @@
+# Data files
+core/data/raw/
+*.csv
+*.zip
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Models
+*.pkl
+*.joblib
+
+# OS
+.DS_Store
