@@ -105,6 +105,10 @@ backend/
 
 ## API v1
 
+Full endpoint reference, examples, error responses, and token lifecycle:
+[docs/API.md](docs/API.md). Import [docs/openapi.json](docs/openapi.json) into
+Postman, Insomnia, or an OpenAPI client generator.
+
 All request bodies below are JSON. Authentication is `Authorization: Bearer <access_token>`, not cookies. No token or password belongs in a URL.
 
 | Method | Path | Behavior |
